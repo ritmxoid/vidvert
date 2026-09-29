@@ -1,0 +1,6 @@
+{
+  "name": "Vertical Crop Recorder",
+  "description": "Convert horizontal 16:9 videos into dynamic 9:16 vertical clips with smooth cursor/touch tracking, zoom, and audio recording.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
