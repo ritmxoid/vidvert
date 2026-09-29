@@ -84,43 +84,52 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "revision": "aef8da3cb64a2895b1076a386a813fb6"
   }, {
     "url": "pwa-512x512.png",
-    "revision": "f475f328864bcae730790507cf1a68c8"
+    "revision": "7617adc70ca272e36cfc7248d85f9a16"
   }, {
     "url": "pwa-192x192.png",
-    "revision": "edd8322dd3b975a60e3349fa2a54ae62"
+    "revision": "1a804093c4f48eb716883f66ebca4f9b"
   }, {
     "url": "index.html",
-    "revision": "e80ce68a02062955154ea070d2de0699"
+    "revision": "8ab8f7afe78b8115c877c8695da02816"
   }, {
     "url": "icon.svg",
     "revision": "bd9e5a1956643590e74a22d5373bf649"
   }, {
-    "url": "favicon.ico",
-    "revision": "862bf0b5b8d8ca5aa798bfce57a9ed87"
-  }, {
-    "url": "apple-touch-icon.png",
-    "revision": "3ca33497be81ed03f39d73da9985dea3"
-  }, {
-    "url": "assets/index-DH_n3X3s.css",
-    "revision": null
-  }, {
-    "url": "assets/index-7p2i3C1y.js",
-    "revision": null
-  }, {
-    "url": "apple-touch-icon.png",
-    "revision": "3ca33497be81ed03f39d73da9985dea3"
+    "url": "favicon.png",
+    "revision": "7a5ab5c244dd4f1882b65dd39ac65f99"
   }, {
     "url": "favicon.ico",
-    "revision": "862bf0b5b8d8ca5aa798bfce57a9ed87"
+    "revision": "c24dfa96b2c7f4d66e5f7d960d1a34d9"
+  }, {
+    "url": "favicon-32x32.png",
+    "revision": "7a5ab5c244dd4f1882b65dd39ac65f99"
+  }, {
+    "url": "favicon-16x16.png",
+    "revision": "5025cdceeee3a21c3f1f9f60bbcf3e07"
+  }, {
+    "url": "apple-touch-icon.png",
+    "revision": "5d6406ae858931fa746a9df4e7af6cc6"
+  }, {
+    "url": "assets/index-moJVzkX6.css",
+    "revision": null
+  }, {
+    "url": "assets/index-CY-VxWIf.js",
+    "revision": null
+  }, {
+    "url": "apple-touch-icon.png",
+    "revision": "5d6406ae858931fa746a9df4e7af6cc6"
+  }, {
+    "url": "favicon.ico",
+    "revision": "c24dfa96b2c7f4d66e5f7d960d1a34d9"
   }, {
     "url": "icon.svg",
     "revision": "bd9e5a1956643590e74a22d5373bf649"
   }, {
     "url": "pwa-192x192.png",
-    "revision": "edd8322dd3b975a60e3349fa2a54ae62"
+    "revision": "1a804093c4f48eb716883f66ebca4f9b"
   }, {
     "url": "pwa-512x512.png",
-    "revision": "f475f328864bcae730790507cf1a68c8"
+    "revision": "7617adc70ca272e36cfc7248d85f9a16"
   }, {
     "url": "pwa-maskable-512x512.png",
     "revision": "aef8da3cb64a2895b1076a386a813fb6"
