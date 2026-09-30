@@ -37,7 +37,16 @@ interface RecordedClip {
   size: string;
   duration: number;
   timestamp: string;
+  filename: string;
 }
+
+// Format exported video filename as requested: VidVert_Crop_<original_name>.<ext>
+const getExportFilename = (sourceName: string, ext: string = 'webm') => {
+  const base = (sourceName || 'video')
+    .replace(/\.[^/.]+$/, '') // strip existing extension (.mp4, .mov, etc)
+    .trim();
+  return `VidVert_Crop_${base || 'video'}.${ext}`;
+};
 
 export default function App() {
   // Video and Canvas references
@@ -49,6 +58,10 @@ export default function App() {
   // Video State
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoName, setVideoName] = useState<string>('');
+  const videoNameRef = useRef<string>('');
+  useEffect(() => {
+    videoNameRef.current = videoName;
+  }, [videoName]);
   const [, setIsVideoLoaded] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -854,6 +867,7 @@ export default function App() {
 
         const url = URL.createObjectURL(finalBlob);
         const clipDuration = Math.round(durationMs / 1000);
+        const exportFilename = getExportFilename(videoNameRef.current || videoName, extension);
 
         const newClip: RecordedClip = {
           id: Date.now().toString(),
@@ -861,13 +875,14 @@ export default function App() {
           blob: finalBlob,
           size: `${(finalBlob.size / (1024 * 1024)).toFixed(2)} MB`,
           duration: clipDuration,
-          timestamp: new Date().toLocaleTimeString()
+          timestamp: new Date().toLocaleTimeString(),
+          filename: exportFilename
         };
 
         setRecordedClips((prev) => [newClip, ...prev]);
 
-        downloadBlob(finalBlob, `vertical-crop-${Date.now()}.${extension}`);
-        showToast(`✅ Запись сохранена: ${formatTime(clipDuration)}`);
+        downloadBlob(finalBlob, exportFilename);
+        showToast(`✅ Сохранено: ${exportFilename}`);
       };
 
       recorder.start(100);
@@ -1178,8 +1193,10 @@ export default function App() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const ext = recordedClips[0].blob.type.includes('mp4') ? 'mp4' : 'webm';
-                      downloadBlob(recordedClips[0].blob, `vertical-clip-${recordedClips[0].id}.${ext}`);
+                      const clip = recordedClips[0];
+                      const ext = clip.blob.type.includes('mp4') ? 'mp4' : 'webm';
+                      const exportName = clip.filename || getExportFilename(videoNameRef.current || videoName, ext);
+                      downloadBlob(clip.blob, exportName);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-lg backdrop-blur transition active:scale-95 cursor-pointer"
                     title="Скачать последнюю запись"
@@ -1731,7 +1748,9 @@ export default function App() {
                   className="rounded-xl bg-slate-950 border border-slate-800 p-2.5 flex flex-col gap-2"
                 >
                   <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span className="font-semibold text-slate-200">Клип #{recordedClips.length - idx}</span>
+                    <span className="font-semibold text-slate-200 truncate max-w-[170px]" title={clip.filename || `Клип #${recordedClips.length - idx}`}>
+                      {clip.filename || `Клип #${recordedClips.length - idx}`}
+                    </span>
                     <span className="font-mono text-[10px]">{clip.timestamp}</span>
                   </div>
 
@@ -1750,8 +1769,12 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => downloadBlob(clip.blob, `vertical-clip-${clip.id}.webm`)}
-                    className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition"
+                    onClick={() => {
+                      const ext = clip.blob.type.includes('mp4') ? 'mp4' : 'webm';
+                      const exportName = clip.filename || getExportFilename(videoNameRef.current || videoName, ext);
+                      downloadBlob(clip.blob, exportName);
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Скачать файл</span>
