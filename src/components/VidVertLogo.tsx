@@ -35,10 +35,10 @@ export const VidVertIcon: React.FC<{ className?: string; size?: number }> = ({
       {/* Right Overlapping Crop Line */}
       <line x1="78" y1="22" x2="78" y2="94" stroke="#22c55e" strokeWidth="8" strokeLinecap="square" />
 
-      {/* Stylized Purple 'V' matching user's design */}
+      {/* Stylized Red 'V' checkmark */}
       <path
         d="M 28 32 L 53 84 L 75 8"
-        stroke="#8b5cf6"
+        stroke="#ef4444"
         strokeWidth="9"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -82,8 +82,8 @@ export const VidVertLogo: React.FC<VidVertLogoProps> = ({
         {/* Center Stylized 'V' Icon Mark that integrates into the word */}
         <div className="mx-0.5 -mt-0.5 relative transition-transform duration-200 group-hover:scale-105">
           <VidVertIcon size={iconSizes[size]} />
-          {/* Subtle glow effect */}
-          <div className="absolute inset-0 bg-violet-500/20 blur-sm rounded-full pointer-events-none -z-10" />
+          {/* Subtle red glow effect */}
+          <div className="absolute inset-0 bg-red-500/20 blur-sm rounded-full pointer-events-none -z-10" />
         </div>
 
         {/* "ERT" completing VIDVERT */}
