@@ -25,8 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   Film,
-  Globe,
-  RotateCcw
+  Globe
 } from 'lucide-react';
 import { PWAInstallButton, OfflineBanner } from './PWAInstallButton';
 import { VidVertLogo, VidVertIcon } from './components/VidVertLogo';
@@ -52,7 +51,6 @@ export interface TranslationStrings {
   pause: string;
   safeZone: string;
   cancelTooltip: string;
-  resetTooltip: string;
   saveTooltip: string;
   downloadTooltip: string;
   toolsToggle: string;
@@ -91,7 +89,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'ПАУЗА',
     safeZone: 'Безопасная зона (Текст/UI не перекрывать)',
     cancelTooltip: 'Сброс / Отменить запись (Esc)',
-    resetTooltip: 'Сбросить все настройки по умолчанию (Esc)',
     saveTooltip: 'Сохранить и скачать (Esc)',
     downloadTooltip: 'Скачать клип',
     toolsToggle: 'Настройки зума, LERP и сетки',
@@ -114,9 +111,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Длительность',
     downloadBtn: 'Скачать',
     howToUse: 'Как пользоваться',
-    instructionsText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения. Для доступа к настройкам, прокрутите страницу вверх за край экрана.',
+    instructionsText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения.',
     modalTitle: 'Как пользоваться VidVert',
-    modalText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения. Для доступа к настройкам, прокрутите страницу вверх за край экрана.',
+    modalText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения.',
     dontShowAgain: 'Больше не показывать',
     modalOk: 'Понятно'
   },
@@ -128,7 +125,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSE',
     safeZone: 'Safe zone (Keep clear of text/UI)',
     cancelTooltip: 'Reset / Cancel recording (Esc)',
-    resetTooltip: 'Reset all settings to default (Esc)',
     saveTooltip: 'Save and download (Esc)',
     downloadTooltip: 'Download clip',
     toolsToggle: 'Zoom, LERP & Grid settings',
@@ -151,9 +147,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Duration',
     downloadBtn: 'Download',
     howToUse: 'How to Use',
-    instructionsText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue. To access settings, scroll the page up beyond the edge of the screen.',
+    instructionsText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue.',
     modalTitle: 'How to Use VidVert',
-    modalText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue. To access settings, scroll the page up beyond the edge of the screen.',
+    modalText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue.',
     dontShowAgain: 'Don’t show again',
     modalOk: 'Got it'
   },
@@ -165,7 +161,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSA',
     safeZone: 'Zona segura (No tapar con texto/UI)',
     cancelTooltip: 'Reiniciar / Cancelar grabación (Esc)',
-    resetTooltip: 'Restablecer todos los ajustes (Esc)',
     saveTooltip: 'Guardar y descargar (Esc)',
     downloadTooltip: 'Descargar clip',
     toolsToggle: 'Ajustes de Zoom, LERP y Cuadrícula',
@@ -188,9 +183,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Duración',
     downloadBtn: 'Descargar',
     howToUse: 'Cómo usar',
-    instructionsText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar. Para acceder a la configuración, desplace la página hacia arriba más allá del borde de la pantalla.',
+    instructionsText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar.',
     modalTitle: 'Cómo usar VidVert',
-    modalText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar. Para acceder a la configuración, desplace la página hacia arriba más allá del borde de la pantalla.',
+    modalText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar.',
     dontShowAgain: 'No volver a mostrar',
     modalOk: 'Entendido'
   },
@@ -202,7 +197,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSE',
     safeZone: 'Sicherheitszone (Text/UI freihalten)',
     cancelTooltip: 'Abbrechen / Zurücksetzen (Esc)',
-    resetTooltip: 'Alle Einstellungen zurücksetzen (Esc)',
     saveTooltip: 'Speichern und herunterladen (Esc)',
     downloadTooltip: 'Clip herunterladen',
     toolsToggle: 'Zoom, LERP & Raster Einstellungen',
@@ -225,9 +219,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Dauer',
     downloadBtn: 'Herunterladen',
     howToUse: 'So verwenden Sie VidVert',
-    instructionsText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren. Um auf die Einstellungen zuzugreifen, scrollen Sie die Seite über den Bildschirmrand nach oben.',
+    instructionsText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren.',
     modalTitle: 'So verwenden Sie VidVert',
-    modalText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren. Um auf die Einstellungen zuzugreifen, scrollen Sie die Seite über den Bildschirmrand nach oben.',
+    modalText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren.',
     dontShowAgain: 'Nicht mehr anzeigen',
     modalOk: 'Verstanden'
   },
@@ -239,7 +233,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSE',
     safeZone: 'Zone sûre (Ne pas superposer texte/UI)',
     cancelTooltip: 'Annuler l’enregistrement (Esc)',
-    resetTooltip: 'Réinitialiser tous les paramètres (Esc)',
     saveTooltip: 'Enregistrer et télécharger (Esc)',
     downloadTooltip: 'Télécharger le clip',
     toolsToggle: 'Paramètres Zoom, LERP et Grille',
@@ -262,9 +255,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Durée',
     downloadBtn: 'Télécharger',
     howToUse: 'Comment utiliser',
-    instructionsText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer. Pour accéder aux paramètres, faites défiler la page vers le haut au-delà du bord de l\'écran.',
+    instructionsText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer.',
     modalTitle: 'Comment utiliser VidVert',
-    modalText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer. Pour accéder aux paramètres, faites défiler la page vers le haut au-delà du bord de l\'écran.',
+    modalText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer.',
     dontShowAgain: 'Ne plus afficher',
     modalOk: 'Compris'
   },
@@ -276,7 +269,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: '暂停',
     safeZone: '安全区域 (避免被字幕/UI遮挡)',
     cancelTooltip: '重置 / 取消录制 (Esc)',
-    resetTooltip: '重置所有默认设置 (Esc)',
     saveTooltip: '保存并下载 (Esc)',
     downloadTooltip: '下载视频片段',
     toolsToggle: '缩放、LERP 与网格设置',
@@ -299,9 +291,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: '时长',
     downloadBtn: '下载',
     howToUse: '如何使用',
-    instructionsText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。如需访问设置，请向上滚动页面超出屏幕边缘。',
+    instructionsText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。',
     modalTitle: '如何使用 VidVert',
-    modalText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。如需访问设置，请向上滚动页面超出屏幕边缘。',
+    modalText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。',
     dontShowAgain: '不再显示',
     modalOk: '知道了'
   },
@@ -313,7 +305,6 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: '一時停止',
     safeZone: 'セーフゾーン (テキストやUIで隠さないエリア)',
     cancelTooltip: 'リセット / 録画キャンセル (Esc)',
-    resetTooltip: 'すべての設定を初期化 (Esc)',
     saveTooltip: '保存してダウンロード (Esc)',
     downloadTooltip: 'クリップを保存',
     toolsToggle: 'ズーム・LERP・グリッド設定',
@@ -336,9 +327,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: '再生時間',
     downloadBtn: '保存',
     howToUse: '使い方',
-    instructionsText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。設定にアクセスするには、ページを画面の端を超えて上にスクロールしてください。',
+    instructionsText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。',
     modalTitle: 'VidVertの使い方',
-    modalText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。設定にアクセスするには、ページを画面の端を超えて上にスクロールしてください。',
+    modalText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。',
     dontShowAgain: '次回から表示しない',
     modalOk: '了解'
   }
@@ -1214,26 +1205,6 @@ export default function App() {
     showToast('Запись отменена!');
   };
 
-  // Reset all settings, viewfinder position, zoom, and LERP to default values
-  const resetToDefaults = () => {
-    if (isRecording) {
-      cancelRecording();
-    }
-    targetPosRef.current = { x: 0.5, y: 0.5 };
-    currentPosRef.current = { x: 0.5, y: 0.5 };
-    setUiTargetPos({ x: 0.5, y: 0.5 });
-    targetZoomRef.current = 1.0;
-    currentZoomRef.current = 1.0;
-    displayZoomRef.current = 1.0;
-    setZoom(1.0);
-    setDisplayZoom(1.0);
-    setLerpFactor(0.1);
-    setWheelDirection('forward-plus');
-    setShowGuides(false);
-    setShowSafeZone(false);
-    showToast('Сброс всех настроек по умолчанию');
-  };
-
   // Helper to trigger browser download
   const downloadBlob = (blob: Blob, filename: string) => {
     const a = document.createElement('a');
@@ -1405,18 +1376,19 @@ export default function App() {
 
               {/* RIGHT-SIDE ACTION BUTTONS (Icon-only: Reset & Save, positioned on the right above 9:16 badge) */}
               <div className="absolute right-2 bottom-8 flex flex-col gap-2 z-30">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    resetToDefaults();
-                  }}
-                  className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-amber-500/80 flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 cursor-pointer"
-                  title={t.resetTooltip}
-                >
-                  <RotateCcw className="w-4 h-4 text-amber-400" />
-                </button>
-
+                {isRecording && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cancelRecording();
+                    }}
+                    className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-rose-400 border border-orange-500/80 flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 cursor-pointer"
+                    title={t.cancelTooltip}
+                  >
+                    <Square className="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
+                  </button>
+                )}
                 {(isRecording || recordedClips.length > 0) && (
                   <button
                     type="button"
