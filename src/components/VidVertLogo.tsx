@@ -60,15 +60,15 @@ export const VidVertLogo: React.FC<VidVertLogoProps> = ({
   className = ''
 }) => {
   const textSizes = {
-    sm: 'text-lg',
-    md: 'text-2xl',
-    lg: 'text-3xl'
+    sm: 'text-base sm:text-lg',
+    md: 'text-lg xs:text-xl sm:text-2xl',
+    lg: 'text-2xl sm:text-3xl'
   };
 
   const iconSizes = {
-    sm: 26,
-    md: 36,
-    lg: 44
+    sm: 22,
+    md: 28,
+    lg: 40
   };
 
   return (

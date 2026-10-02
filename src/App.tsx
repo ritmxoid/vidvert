@@ -6,7 +6,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload,
-  Video,
   Play,
   Pause,
   Square,
@@ -24,11 +23,14 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Film
+  Film,
+  Image as ImageIcon
 } from 'lucide-react';
-import { PWAInstallButton, OfflineBanner } from './PWAInstallButton';
 import { VidVertLogo, VidVertIcon } from './components/VidVertLogo';
-import { patchWebmDuration } from './utils/fixWebmDuration';
+import { safeFixWebm, patchWebmDuration } from './utils/fixWebmDuration';
+import { translations, LanguageCode, detectBrowserLanguage } from './i18n/translations';
+import { LanguageSelector } from './components/LanguageSelector';
+import { InteractiveTutorialModal } from './components/InteractiveTutorialModal';
 
 interface RecordedClip {
   id: string;
@@ -40,22 +42,54 @@ interface RecordedClip {
   filename: string;
 }
 
-// Format exported video filename as requested: VidVert_Crop_<original_name>.<ext>
+// Format exported video filename: VidVert_Crop_<original_name>.<ext>
 const getExportFilename = (sourceName: string, ext: string = 'webm') => {
   const base = (sourceName || 'video')
-    .replace(/\.[^/.]+$/, '') // strip existing extension (.mp4, .mov, etc)
+    .replace(/\.[^/.]+$/, '') // strip existing extension
     .trim();
   return `VidVert_Crop_${base || 'video'}.${ext}`;
 };
 
 export default function App() {
+  // i18n Language State (Auto-detects browser language, persists in localStorage)
+  const [currentLang, setCurrentLang] = useState<LanguageCode>(() => {
+    return detectBrowserLanguage();
+  });
+
+  const handleSelectLang = (newLang: LanguageCode) => {
+    setCurrentLang(newLang);
+    try {
+      localStorage.setItem('vidvert_lang', newLang);
+    } catch {}
+  };
+
+  const t = translations[currentLang] || translations.ru;
+
+  // Interactive 30s Tutorial Modal State (Auto-opens on first visit, or manually via button)
+  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('vidvert_seen_tutorial_v1');
+    } catch {
+      return false;
+    }
+  });
+
+  const handleCloseTutorial = () => {
+    setShowTutorialModal(false);
+    try {
+      localStorage.setItem('vidvert_seen_tutorial_v1', 'true');
+    } catch {}
+  };
+
   // Video and Canvas references
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sourceContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Video State
+  // Media (Video or Horizontal Image) State
+  const [mediaType, setMediaType] = useState<'video' | 'image'>('video');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoName, setVideoName] = useState<string>('');
   const videoNameRef = useRef<string>('');
@@ -63,11 +97,11 @@ export default function App() {
     videoNameRef.current = videoName;
   }, [videoName]);
   const [, setIsVideoLoaded] = useState<boolean>(false);
+  const [, setIsImageLoaded] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [, setVolume] = useState<number>(1);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number }>({ width: 1920, height: 1080 });
 
@@ -112,7 +146,6 @@ export default function App() {
 
   // Touch & Pinch State
   const initialPinchDistRef = useRef<number | null>(null);
-  const initialZoomRef = useRef<number>(1.0);
 
   // Recording State
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -125,7 +158,6 @@ export default function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
-  const recordingStartTimeRef = useRef<number>(0);
   const totalRecordedMsRef = useRef<number>(0);
   const lastResumeTimeRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -194,187 +226,58 @@ export default function App() {
     };
   }, []);
 
-  // Handle Video File Upload with full Android/iOS & Desktop format support
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Handle Media File Upload (Video or Image)
+  const handleMediaFile = (file: File) => {
     if (!file) return;
 
+    if (videoSrc && videoSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(videoSrc);
+    }
+
+    const isImg = file.type.startsWith('image/');
+    setMediaType(isImg ? 'image' : 'video');
+
+    const url = URL.createObjectURL(file);
+    setVideoSrc(url);
+    setVideoName(file.name);
+    videoNameRef.current = file.name;
+    setIsPlaying(false);
+    setCurrentTime(0);
     setErrorMessage(null);
 
-    try {
-      if (videoSrc && videoSrc.startsWith('blob:')) {
-        URL.revokeObjectURL(videoSrc);
-      }
+    // Reset zoom and position
+    targetZoomRef.current = 1.0;
+    currentZoomRef.current = 1.0;
+    displayZoomRef.current = 1.0;
+    setDisplayZoom(1.0);
+    targetPosRef.current = { x: 0.5, y: 0.5 };
+    currentPosRef.current = { x: 0.5, y: 0.5 };
+    setUiTargetPos({ x: 0.5, y: 0.5 });
 
-      const url = URL.createObjectURL(file);
-      setVideoSrc(url);
-      setVideoName(file.name);
+    if (isImg) {
+      const img = new Image();
+      img.onload = () => {
+        setVideoDimensions({
+          width: img.naturalWidth || 1920,
+          height: img.naturalHeight || 1080
+        });
+        setDuration(0);
+        setIsImageLoaded(true);
+        setIsVideoLoaded(true);
+      };
+      img.src = url;
+    } else {
+      setIsImageLoaded(false);
       setIsVideoLoaded(false);
-      showToast(`Загружено: ${file.name}`);
-    } catch (err) {
-      console.error('File load error:', err);
-      setErrorMessage('Не удалось загрузить видеофайл');
-    } finally {
-      // Clear input so selecting the same file again works
-      e.target.value = '';
     }
+
+    showToast(`✓ ${file.name}`);
   };
 
-  // Generate built-in Demo Video with Audio for instant testing
-  const generateDemoVideo = () => {
-    setErrorMessage(null);
-    showToast('Создание демонстрационного ролика 16:9 с анимацией и звуком...');
-
-    const demoCanvas = document.createElement('canvas');
-    demoCanvas.width = 1280;
-    demoCanvas.height = 720;
-    const ctx = demoCanvas.getContext('2d');
-    if (!ctx) return;
-
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const synthAudioCtx = new AudioCtx();
-    const synthDest = synthAudioCtx.createMediaStreamDestination();
-
-    const osc = synthAudioCtx.createOscillator();
-    const gain = synthAudioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(220, synthAudioCtx.currentTime);
-    gain.gain.setValueAtTime(0.15, synthAudioCtx.currentTime);
-    osc.connect(gain);
-    gain.connect(synthDest);
-    osc.start();
-
-    const lfo = synthAudioCtx.createOscillator();
-    const lfoGain = synthAudioCtx.createGain();
-    lfo.frequency.setValueAtTime(2, synthAudioCtx.currentTime);
-    lfoGain.gain.setValueAtTime(50, synthAudioCtx.currentTime);
-    lfo.connect(osc.frequency);
-    lfo.start();
-
-    const canvasStream = demoCanvas.captureStream(30);
-    const combinedDemoStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...synthDest.stream.getAudioTracks()
-    ]);
-
-    let mimeType = 'video/webm;codecs=vp8,opus';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
-    }
-
-    const recorder = new MediaRecorder(combinedDemoStream, { mimeType });
-    const chunks: Blob[] = [];
-
-    recorder.ondataavailable = (ev) => {
-      if (ev.data.size > 0) chunks.push(ev.data);
-    };
-
-    recorder.onstop = () => {
-      osc.stop();
-      lfo.stop();
-      synthAudioCtx.close().catch(() => {});
-
-      const demoBlob = new Blob(chunks, { type: mimeType });
-      const demoUrl = URL.createObjectURL(demoBlob);
-      setVideoSrc(demoUrl);
-      setVideoName('Demo_Landscape_Action_16x9.webm');
-      setIsVideoLoaded(false);
-      showToast('Демо-видео успешно создано и загружено!');
-    };
-
-    recorder.start(100);
-
-    let frame = 0;
-    const maxFrames = 300;
-
-    const renderDemoFrame = () => {
-      if (frame >= maxFrames) {
-        recorder.stop();
-        return;
-      }
-
-      const t = frame / 30;
-
-      const bgGrad = ctx.createLinearGradient(0, 0, 1280, 720);
-      bgGrad.addColorStop(0, '#0f172a');
-      bgGrad.addColorStop(0.5, '#1e1b4b');
-      bgGrad.addColorStop(1, '#020617');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, 1280, 720);
-
-      ctx.strokeStyle = 'rgba(99, 102, 241, 0.15)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < 1280; x += 60) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, 720);
-        ctx.stroke();
-      }
-      for (let y = 0; y < 720; y += 60) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(1280, y);
-        ctx.stroke();
-      }
-
-      const ballX = 640 + Math.sin(t * 1.5) * 450;
-      const ballY = 360 + Math.cos(t * 2.2) * 180;
-      const ballGrad = ctx.createRadialGradient(ballX, ballY, 5, ballX, ballY, 45);
-      ballGrad.addColorStop(0, '#38bdf8');
-      ballGrad.addColorStop(0.7, '#6366f1');
-      ballGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
-      ctx.fillStyle = ballGrad;
-      ctx.beginPath();
-      ctx.arc(ballX, ballY, 45, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(ballX, ballY, 15, 0, Math.PI * 2);
-      ctx.fill();
-
-      const runnerX = ((t * 120) % 1400) - 60;
-      ctx.fillStyle = '#ec4899';
-      ctx.beginPath();
-      ctx.roundRect(runnerX, 480, 60, 120, 12);
-      ctx.fill();
-      ctx.fillStyle = '#f43f5e';
-      ctx.beginPath();
-      ctx.arc(runnerX + 30, 450, 24, 0, Math.PI * 2);
-      ctx.fill();
-
-      const droneX = 640 + Math.cos(t * 1.1) * 380;
-      const droneY = 180 + Math.sin(t * 1.8) * 80;
-      ctx.fillStyle = '#10b981';
-      ctx.beginPath();
-      ctx.arc(droneX, droneY, 20, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 28px sans-serif';
-      ctx.fillText('16:9 ГОРИЗОНТАЛЬНЫЙ ИСТОЧНИК', 60, 80);
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '16px monospace';
-      ctx.fillText(`TIME: ${t.toFixed(2)}s | SPEED: 30 FPS | ДВИЖЕНИЕ ОБЪЕКТОВ ДЛЯ КРОПА`, 60, 115);
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '18px monospace';
-      ctx.fillText('⚡ ОБЪЕКТ АЛЬФА', ballX - 60, ballY - 55);
-
-      ctx.fillStyle = '#ec4899';
-      ctx.font = '18px monospace';
-      ctx.fillText('🏃 ОБЪЕКТ БЕТА', runnerX - 40, 410);
-
-      ctx.fillStyle = '#10b981';
-      ctx.font = '18px monospace';
-      ctx.fillText('🛸 ДРОН', droneX - 30, droneY - 30);
-
-      frame++;
-      requestAnimationFrame(renderDemoFrame);
-    };
-
-    renderDemoFrame();
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleMediaFile(file);
+    e.target.value = '';
   };
 
   // Video metadata loaded
@@ -423,16 +326,17 @@ export default function App() {
     }
   };
 
-  // Seek video to specific timestamp
-  const seekVideo = (time: number) => {
-    if (!videoRef.current) return;
-    const clamped = Math.max(0, Math.min(duration || 0, time));
-    setCurrentTime(clamped);
-    videoRef.current.currentTime = clamped;
-  };
-
-  // Toggle Video Playback
+  // Toggle Video Playback or Image Mode Recording
   const togglePlay = () => {
+    if (mediaType === 'image') {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        stopRecordingAndDownload();
+      }
+      return;
+    }
+
     if (!videoRef.current) return;
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().catch(() => {});
@@ -476,33 +380,20 @@ export default function App() {
     }
   };
 
-  // Click handler for 16:9 Source area
-  const handleSourceClick = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    if (!isRecording) {
-      startRecording();
-    } else {
-      togglePauseRecording();
-    }
-  };
-
   // Right-click on 16:9 Source area
   const handleSourceContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (mediaType === 'image') {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        stopRecordingAndDownload();
+      }
+      return;
+    }
     togglePlay();
     const willBePlaying = videoRef.current?.paused;
-    showToast(willBePlaying ? '▶ Воспроизведение (ПКМ)' : '⏸ Пауза (ПКМ)');
-  };
-
-  // Click handler for 9:16 Canvas area
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-
-    if (!isRecording) {
-      startRecording();
-    } else {
-      togglePauseRecording();
-    }
+    showToast(willBePlaying ? t.toastPlayRMB : t.toastPauseRMB);
   };
 
   // Right-click on 9:16 Canvas area
@@ -510,59 +401,13 @@ export default function App() {
     e.preventDefault();
     if (isRecording) {
       stopRecordingAndDownload();
-      showToast('🛑 Запись остановлена и скачана (ПКМ)');
+      showToast(t.toastStopRMB);
     } else {
       togglePlay();
       const willBePlaying = videoRef.current?.paused;
-      showToast(willBePlaying ? '▶ Воспроизведение (ПКМ)' : '⏸ Пауза (ПКМ)');
+      showToast(willBePlaying ? t.toastPlayRMB : t.toastPauseRMB);
     }
   };
-
-  // Speed controls via mouse side buttons
-  useEffect(() => {
-    const speeds = [0.5, 1, 1.5, 2];
-
-    const handleSideButtons = (e: MouseEvent) => {
-      if (e.button === 3) {
-        e.preventDefault();
-        e.stopPropagation();
-        setPlaybackRate((prev) => {
-          const idx = speeds.indexOf(prev);
-          const nextIdx = idx > 0 ? idx - 1 : 0;
-          const nextRate = speeds[nextIdx];
-          if (videoRef.current) videoRef.current.playbackRate = nextRate;
-          showToast(`⏪ Скорость: ${nextRate}x (боковая кнопка мыши)`);
-          return nextRate;
-        });
-      } else if (e.button === 4) {
-        e.preventDefault();
-        e.stopPropagation();
-        setPlaybackRate((prev) => {
-          const idx = speeds.indexOf(prev);
-          const nextIdx = idx < speeds.length - 1 ? idx + 1 : speeds.length - 1;
-          const nextRate = speeds[nextIdx];
-          if (videoRef.current) videoRef.current.playbackRate = nextRate;
-          showToast(`⏩ Скорость: ${nextRate}x (боковая кнопка мыши)`);
-          return nextRate;
-        });
-      }
-    };
-
-    const handleAuxClick = (e: MouseEvent) => {
-      if (e.button === 3 || e.button === 4) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    window.addEventListener('mousedown', handleSideButtons);
-    window.addEventListener('mouseup', handleAuxClick);
-
-    return () => {
-      window.removeEventListener('mousedown', handleSideButtons);
-      window.removeEventListener('mouseup', handleAuxClick);
-    };
-  }, []);
 
   // Helper to change zoom smoothly or immediately
   const handleZoomChange = (newZoom: number, snap = false) => {
@@ -634,25 +479,10 @@ export default function App() {
       const touch2 = e.touches[1];
       const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
       initialPinchDistRef.current = dist;
-      initialZoomRef.current = currentZoomRef.current;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.cancelable) {
-      e.preventDefault();
-    }
-
-    if (e.touches.length === 2 && initialPinchDistRef.current !== null) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const currentDist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      const scaleFactor = currentDist / initialPinchDistRef.current;
-      const newZoom = Math.max(0.8, Math.min(3.0, Number((initialZoomRef.current * scaleFactor).toFixed(2))));
-      handleZoomChange(newZoom, true);
-      return;
-    }
-
     if (e.touches.length === 1 && isTrackingActive) {
       const touch = e.touches[0];
       const target = sourceContainerRef.current || (e.currentTarget as HTMLElement);
@@ -661,104 +491,121 @@ export default function App() {
       const relY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
       targetPosRef.current = { x: relX, y: relY };
       setUiTargetPos({ x: relX, y: relY });
+    } else if (e.touches.length === 2 && initialPinchDistRef.current !== null) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      const factor = dist / initialPinchDistRef.current;
+      const newZoom = Math.max(0.8, Math.min(3.0, currentZoomRef.current * factor));
+      targetZoomRef.current = newZoom;
+      setZoomHudVisible(true);
+      if (zoomHudTimerRef.current) clearTimeout(zoomHudTimerRef.current);
+      zoomHudTimerRef.current = window.setTimeout(() => setZoomHudVisible(false), 1200);
     }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (e.touches.length < 2) {
-      initialPinchDistRef.current = null;
-    }
+  const handleTouchEnd = () => {
+    initialPinchDistRef.current = null;
   };
 
-  // Main Canvas Render Loop
+  // Main Render Loop (Draws 9:16 Crop from 16:9 Video to Canvas)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    let isRunning = true;
-
     const render = () => {
-      if (!isRunning) return;
+      // 1. LERP Position
+      const targetPos = targetPosRef.current;
+      const currentPos = currentPosRef.current;
+      currentPos.x += (targetPos.x - currentPos.x) * lerpFactor;
+      currentPos.y += (targetPos.y - currentPos.y) * lerpFactor;
 
-      const video = videoRef.current;
+      // 2. LERP Zoom
+      const targetZoom = targetZoomRef.current;
+      const currentZoom = currentZoomRef.current;
+      currentZoomRef.current += (targetZoom - currentZoom) * (lerpFactor * 1.5);
+      const activeZoom = Math.max(0.8, Math.min(3.0, currentZoomRef.current));
 
-      // Smooth LERP tracking calculation on EVERY frame
-      currentPosRef.current.x += (targetPosRef.current.x - currentPosRef.current.x) * lerpFactor;
-      currentPosRef.current.y += (targetPosRef.current.y - currentPosRef.current.y) * lerpFactor;
-
-      const zoomDelta = targetZoomRef.current - currentZoomRef.current;
-      if (Math.abs(zoomDelta) > 0.0001) {
-        currentZoomRef.current += zoomDelta * 0.06;
-      } else {
-        currentZoomRef.current = targetZoomRef.current;
-      }
-
-      const activeZoom = currentZoomRef.current;
-      const sw = (video && video.videoWidth > 0) ? video.videoWidth : (videoDimensions.width || 1920);
-      const sh = (video && video.videoHeight > 0) ? video.videoHeight : (videoDimensions.height || 1080);
-
-      const baseCropHeight = sh / activeZoom;
-      const baseCropWidth = (baseCropHeight * 9) / 16;
-
-      let cropW = baseCropWidth;
-      let cropH = baseCropHeight;
-
-      if (cropW > sw) {
-        cropW = sw;
-        cropH = (cropW * 16) / 9;
-      }
-      if (cropH > sh) {
-        cropH = sh;
-        cropW = (cropH * 9) / 16;
-      }
-
-      const centerX = currentPosRef.current.x * sw;
-      const centerY = currentPosRef.current.y * sh;
-
-      const sx = Math.max(0, Math.min(sw - cropW, centerX - cropW / 2));
-      const sy = Math.max(0, Math.min(sh - cropH, centerY - cropH / 2));
-
-      // Always update viewfinder box DOM in sync with requestAnimationFrame!
-      if (viewfinderBoxRef.current) {
-        const leftPercent = (sx / sw) * 100;
-        const topPercent = (sy / sh) * 100;
-        const widthPercent = (cropW / sw) * 100;
-        const heightPercent = (cropH / sh) * 100;
-        viewfinderBoxRef.current.style.left = `${leftPercent}%`;
-        viewfinderBoxRef.current.style.top = `${topPercent}%`;
-        viewfinderBoxRef.current.style.width = `${widthPercent}%`;
-        viewfinderBoxRef.current.style.height = `${heightPercent}%`;
-      }
-
-      // Draw video frame to canvas
-      if (video && (video.readyState >= 1 || video.videoWidth > 0)) {
-        try {
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
-        } catch (drawErr) {
-          // Keep loop alive if transient frame decode glitch
-        }
-      } else {
-        ctx.fillStyle = '#090d16';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#64748b';
-        ctx.font = '22px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Загрузите горизонтальное видео (16:9)', canvas.width / 2, canvas.height / 2);
-      }
-
+      // Sync display zoom state throttled
       const now = performance.now();
-      if (now - lastUiSyncRef.current > 50) {
+      if (now - lastUiSyncRef.current > 120) {
         lastUiSyncRef.current = now;
-        if (Math.abs(currentZoomRef.current - displayZoomRef.current) > 0.01) {
-          displayZoomRef.current = currentZoomRef.current;
-          setDisplayZoom(Number(currentZoomRef.current.toFixed(2)));
-          setZoom(Number(currentZoomRef.current.toFixed(2)));
+        if (Math.abs(displayZoomRef.current - activeZoom) > 0.02) {
+          displayZoomRef.current = activeZoom;
+          setDisplayZoom(Number(activeZoom.toFixed(2)));
         }
+      }
+
+      // Fast direct DOM update of viewfinder box
+      const vf = viewfinderBoxRef.current;
+      if (vf && videoDimensions.width && videoDimensions.height) {
+        const sw = videoDimensions.width;
+        const sh = videoDimensions.height;
+        const baseCropH = sh / activeZoom;
+        const baseCropW = (baseCropH * 9) / 16;
+        let cropW = Math.min(sw, baseCropW);
+        let cropH = Math.min(sh, baseCropH);
+
+        const currentCenterX = currentPos.x * sw;
+        const currentCenterY = currentPos.y * sh;
+        const sx = Math.max(0, Math.min(sw - cropW, currentCenterX - cropW / 2));
+        const sy = Math.max(0, Math.min(sh - cropH, currentCenterY - cropH / 2));
+
+        vf.style.left = `${(sx / sw) * 100}%`;
+        vf.style.top = `${(sy / sh) * 100}%`;
+        vf.style.width = `${(cropW / sw) * 100}%`;
+        vf.style.height = `${(cropH / sh) * 100}%`;
+      }
+
+      // 3. Draw Video or Image onto Canvas
+      const video = videoRef.current;
+      const img = imageRef.current;
+
+      const sourceEl: CanvasImageSource | null =
+        mediaType === 'image'
+          ? (img && img.complete && img.naturalWidth > 0 ? img : null)
+          : (video && video.readyState >= 2 ? video : null);
+
+      if (sourceEl) {
+        const sw =
+          mediaType === 'image'
+            ? (img?.naturalWidth || videoDimensions.width || 1920)
+            : (video?.videoWidth || videoDimensions.width || 1920);
+        const sh =
+          mediaType === 'image'
+            ? (img?.naturalHeight || videoDimensions.height || 1080)
+            : (video?.videoHeight || videoDimensions.height || 1080);
+
+        const baseCropH = sh / activeZoom;
+        const baseCropW = (baseCropH * 9) / 16;
+        let cropW = baseCropW;
+        let cropH = baseCropH;
+
+        if (cropW > sw) {
+          cropW = sw;
+          cropH = (cropW * 16) / 9;
+        }
+        if (cropH > sh) {
+          cropH = sh;
+          cropW = (cropH * 9) / 16;
+        }
+
+        const currentCenterX = currentPos.x * sw;
+        const currentCenterY = currentPos.y * sh;
+        const sx = Math.max(0, Math.min(sw - cropW, currentCenterX - cropW / 2));
+        const sy = Math.max(0, Math.min(sh - cropH, currentCenterY - cropH / 2));
+
+        ctx.drawImage(sourceEl, sx, sy, cropW, cropH, 0, 0, canvasWidth, canvasHeight);
+      } else {
+        // Fallback / Placeholder
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        ctx.fillStyle = '#334155';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.fillText('9:16 LIVE CROP', canvasWidth / 2, canvasHeight / 2);
       }
 
       animFrameIdRef.current = requestAnimationFrame(render);
@@ -767,146 +614,122 @@ export default function App() {
     animFrameIdRef.current = requestAnimationFrame(render);
 
     return () => {
-      isRunning = false;
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
     };
-  }, [lerpFactor, resolution, videoDimensions]);
+  }, [canvasWidth, canvasHeight, lerpFactor, videoDimensions, mediaType]);
 
-  // Start MediaRecorder with combined Canvas Stream + Video Audio
-  const startRecording = async () => {
-    if (!canvasRef.current || !videoRef.current) {
-      setErrorMessage('Видео или Canvas не инициализированы');
-      return;
-    }
+  // Start Recording Stream
+  const startRecording = () => {
+    if (isRecording) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
     try {
-      if (audioContextRef.current?.state === 'suspended') {
-        await audioContextRef.current.resume();
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
       }
 
-      const canvasStream = canvasRef.current.captureStream(fps);
-      const audioTracks: MediaStreamTrack[] = [];
+      const canvasStream = canvas.captureStream(fps);
+      const combinedStream = new MediaStream();
 
-      if (audioDestNodeRef.current) {
-        const destTracks = audioDestNodeRef.current.stream.getAudioTracks();
-        if (destTracks.length > 0) {
-          audioTracks.push(destTracks[0]);
-        }
+      canvasStream.getVideoTracks().forEach((track) => combinedStream.addTrack(track));
+
+      if (audioDestNodeRef.current && audioDestNodeRef.current.stream) {
+        audioDestNodeRef.current.stream.getAudioTracks().forEach((track) => {
+          combinedStream.addTrack(track);
+        });
       }
-
-      if (audioTracks.length === 0) {
-        const videoEl = videoRef.current as HTMLVideoElement & {
-          captureStream?: () => MediaStream;
-          mozCaptureStream?: () => MediaStream;
-        };
-        const vidStream = videoEl.captureStream ? videoEl.captureStream() : videoEl.mozCaptureStream ? videoEl.mozCaptureStream() : null;
-        if (vidStream) {
-          const vAudioTracks = vidStream.getAudioTracks();
-          if (vAudioTracks.length > 0) {
-            audioTracks.push(vAudioTracks[0]);
-          }
-        }
-      }
-
-      const combinedTracks = [...canvasStream.getVideoTracks(), ...audioTracks];
-      const combinedStream = new MediaStream(combinedTracks);
 
       const mimeTypes = [
-        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-        'video/mp4;codecs=avc1',
+        'video/mp4;codecs=avc1,mp4a.40.2',
         'video/mp4',
+        'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
         'video/webm'
       ];
-
-      let selectedMimeType = '';
+      let selectedMime = '';
       for (const mime of mimeTypes) {
         if (MediaRecorder.isTypeSupported(mime)) {
-          selectedMimeType = mime;
+          selectedMime = mime;
           break;
         }
       }
 
-      if (!selectedMimeType) {
-        setErrorMessage('Ваш браузер не поддерживает доступные кодеки MediaRecorder');
-        return;
-      }
-
       const options: MediaRecorderOptions = {
-        mimeType: selectedMimeType,
-        videoBitsPerSecond: resolution === '1080p' ? 8_000_000 : 4_500_000
+        videoBitsPerSecond: resolution === '1080p' ? 12_000_000 : 8_000_000
       };
+      if (selectedMime) options.mimeType = selectedMime;
 
-      const recorder = new MediaRecorder(combinedStream, options);
+      const mediaRecorder = new MediaRecorder(combinedStream, options);
+      mediaRecorderRef.current = mediaRecorder;
       recordedChunksRef.current = [];
 
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
         }
       };
 
-      recorder.onstop = async () => {
-        const extension = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
-        let finalBlob = new Blob(recordedChunksRef.current, { type: selectedMimeType });
+      mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(recordedChunksRef.current, {
+          type: selectedMime || 'video/webm'
+        });
 
-        let computedDurationMs = totalRecordedMsRef.current;
-        if (lastResumeTimeRef.current > 0) {
-          computedDurationMs += Math.max(0, performance.now() - lastResumeTimeRef.current);
-        }
-        const durationMs = Math.max(1000, Math.round(computedDurationMs));
+        const elapsedMs = totalRecordedMsRef.current;
+        let finalBlob = rawBlob;
 
-        // Inject EBML duration metadata so mobile gallery and players display total time and allow seeking!
-        if (extension === 'webm') {
+        if (finalBlob.type.includes('webm') && elapsedMs > 0) {
           try {
-            finalBlob = await patchWebmDuration(finalBlob, durationMs);
-          } catch (patchErr) {
-            console.warn('Could not patch WebM duration:', patchErr);
+            finalBlob = await safeFixWebm(finalBlob, elapsedMs / 1000);
+          } catch (e) {
+            console.warn('safeFixWebm notice:', e);
           }
         }
 
         const url = URL.createObjectURL(finalBlob);
-        const clipDuration = Math.round(durationMs / 1000);
-        const exportFilename = getExportFilename(videoNameRef.current || videoName, extension);
+        const durationSec = Math.round(elapsedMs / 1000);
+        const sizeMb = (finalBlob.size / (1024 * 1024)).toFixed(2) + ' MB';
+        const now = new Date();
+        const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        const ext = finalBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        const exportFilename = getExportFilename(videoNameRef.current || videoName, ext);
 
         const newClip: RecordedClip = {
-          id: Date.now().toString(),
+          id: String(Date.now()),
           url,
           blob: finalBlob,
-          size: `${(finalBlob.size / (1024 * 1024)).toFixed(2)} MB`,
-          duration: clipDuration,
-          timestamp: new Date().toLocaleTimeString(),
+          size: sizeMb,
+          duration: durationSec,
+          timestamp,
           filename: exportFilename
         };
 
         setRecordedClips((prev) => [newClip, ...prev]);
-
         downloadBlob(finalBlob, exportFilename);
-        showToast(`✅ Сохранено: ${exportFilename}`);
+        showToast(t.recordingSaved);
       };
 
-      recorder.start(100);
-      mediaRecorderRef.current = recorder;
-      recordingStartTimeRef.current = performance.now();
-      totalRecordedMsRef.current = 0;
-      lastResumeTimeRef.current = performance.now();
+      mediaRecorder.start(500);
       setIsRecording(true);
       setIsRecordingPaused(false);
       setRecordingTime(0);
+      totalRecordedMsRef.current = 0;
+      lastResumeTimeRef.current = performance.now();
 
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingTime((t) => t + 1);
       }, 1000);
 
-      if (videoRef.current.paused) {
+      if (mediaType === 'video' && videoRef.current && videoRef.current.paused) {
         videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
       }
 
-      showToast('🔴 Запись вертикального 9:16 видео НАЧАТА!');
+      showToast(t.recordingStarted);
     } catch (err: unknown) {
       console.error('Recording initialization error:', err);
-      setErrorMessage(`Ошибка старта записи: ${err instanceof Error ? err.message : String(err)}`);
+      setErrorMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -915,7 +738,6 @@ export default function App() {
     if (!mediaRecorderRef.current || !isRecording) return;
 
     if (!isRecordingPaused) {
-      // PAUSE
       if (mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.pause();
       }
@@ -932,9 +754,8 @@ export default function App() {
         videoRef.current.pause();
         setIsPlaying(false);
       }
-      showToast('⏸️ Запись приостановлена');
+      showToast(t.recordingPaused);
     } else {
-      // RESUME
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
         audioContextRef.current.resume().catch(() => {});
       }
@@ -950,19 +771,9 @@ export default function App() {
       }, 1000);
 
       if (videoRef.current) {
-        const playPromise = videoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => setIsPlaying(true))
-            .catch((err) => {
-              console.warn('Video resume retry notice:', err);
-              if (videoRef.current) {
-                videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-              }
-            });
-        }
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
       }
-      showToast('▶️ Запись возобновлена');
+      showToast(t.recordingResumed);
     }
   };
 
@@ -993,7 +804,7 @@ export default function App() {
     }
   };
 
-  // Cancel / Reset recording without saving (Keep original video loaded, rewind to start)
+  // Cancel / Reset recording without saving
   const cancelRecording = () => {
     if (!mediaRecorderRef.current || !isRecording) return;
 
@@ -1003,7 +814,6 @@ export default function App() {
     }
 
     if (mediaRecorderRef.current) {
-      // Detach save handler so it does not save/download the cancelled buffer
       mediaRecorderRef.current.onstop = null;
       if (mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
@@ -1015,7 +825,6 @@ export default function App() {
     setIsRecordingPaused(false);
     setRecordingTime(0);
 
-    // Rewind original video back to the beginning so user can record again immediately
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
@@ -1023,7 +832,7 @@ export default function App() {
       setIsPlaying(false);
     }
 
-    showToast('⏹️ Запись отменена. Оригинал перемотан в начало и готов к записи!');
+    showToast(t.recordingCanceled);
   };
 
   // Helper to trigger browser download
@@ -1087,34 +896,47 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased">
-      {/* Top Navigation Bar (Hidden during recording to free max top space) */}
-      {!isRecording && (
-        <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-40 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 transition-all">
-          <div className="flex items-center gap-2.5">
-            <VidVertLogo size="md" />
-            <div className="hidden lg:block pl-3 border-l border-slate-800">
-              <p className="text-[11px] text-slate-400 font-medium">
-                16:9 → 9:16 динамическое кадрирование с LERP-слежением
-              </p>
-            </div>
+      {/* Top Navigation Bar (Hidden during recording to maximize vertical space) */}
+      {/* Header Bar - Always Stationary */}
+      <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-40 px-2 sm:px-6 py-1.5 sm:py-2 flex items-center justify-between gap-1 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+          <VidVertLogo size="md" />
+          <div className="hidden lg:block pl-3 border-l border-slate-800">
+            <p className="text-[11px] text-slate-400 font-medium">
+              {t.tagline}
+            </p>
           </div>
+        </div>
 
-          {/* Global Action Tool: Upload Video Button in Top Right */}
-          <div className="flex items-center gap-2">
-            <label className="relative flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 transition active:scale-95 shrink-0 cursor-pointer overflow-hidden">
-              <Upload className="w-3.5 h-3.5 pointer-events-none" />
-              <span className="pointer-events-none">Загрузить видео</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                onChange={handleFileUpload}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-              />
-            </label>
-          </div>
-        </header>
-      )}
+        {/* Header Action Tools: Help + Language Switcher + Upload Button */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Simple Clean Round Help Button */}
+          <button
+            type="button"
+            onClick={() => setShowTutorialModal(true)}
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 flex items-center justify-center font-bold shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+            title={t.helpTooltip}
+          >
+            <HelpCircle className="w-4 h-4 text-slate-300" />
+          </button>
+
+          {/* Language Switcher Dropdown */}
+          <LanguageSelector currentLang={currentLang} onSelectLang={handleSelectLang} />
+
+          {/* Upload Video Button */}
+          <label className="relative flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 transition active:scale-95 shrink-0 cursor-pointer overflow-hidden">
+            <Upload className="w-3.5 h-3.5 pointer-events-none" />
+            <span className="pointer-events-none">{t.uploadVideo}</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*,image/*"
+              onChange={handleFileUpload}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+            />
+          </label>
+        </div>
+      </header>
 
       {errorMessage && (
         <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-sm flex items-center justify-between gap-3">
@@ -1126,29 +948,29 @@ export default function App() {
             onClick={() => setErrorMessage(null)}
             className="text-xs px-2 py-1 bg-rose-900 hover:bg-rose-800 rounded text-white"
           >
-            Закрыть
+            {t.close}
           </button>
         </div>
       )}
 
       {/* Main Workspace Layout */}
-      <main className="flex-1 w-full mx-auto p-0 sm:p-4 flex flex-col gap-2 max-w-7xl">
+      <main className="w-full mx-auto p-0 lg:p-4 flex flex-col max-w-7xl">
         
         {/* Mobile & Desktop Main Arena: Both Videos Always Visible Simultaneously */}
-        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 items-stretch">
+        {/* On mobile: h-[calc(100dvh-49px)] maximizes the 9:16 vertical preview height and pushes 16:9 flush to bottom */}
+        <div className="w-full h-[calc(100dvh-49px)] lg:h-auto flex flex-col justify-between lg:grid lg:grid-cols-12 gap-1 lg:gap-3 items-stretch">
           
-          {/* SECTION 1: TOP VERTICAL 9:16 PREVIEW (Placed on top, maximizes height) */}
-          <div className="w-full lg:col-span-5 order-1 flex flex-col items-center bg-slate-950 p-1 sm:p-2 sm:rounded-2xl border-b lg:border border-slate-800/80">
-            {/* Vertical Canvas Frame (Expands vertically to maximum size) */}
+          {/* SECTION 1: TOP VERTICAL 9:16 PREVIEW - MAXIMAL SCREEN HEIGHT */}
+          <div className="w-full lg:col-span-5 order-1 flex-1 min-h-0 flex flex-col items-center justify-center bg-slate-950 p-1 sm:p-2 sm:rounded-2xl border-b lg:border border-slate-800/80">
             <div
               ref={containerRef}
               onContextMenu={handleCanvasContextMenu}
               style={{ touchAction: 'none', overscrollBehavior: 'none' }}
-              className={`relative aspect-[9/16] transition-all duration-300 w-full ${
+              className={`relative aspect-[9/16] h-full max-h-full w-auto max-w-full lg:h-[68vh] lg:max-h-[720px] rounded-xl overflow-hidden bg-black border-2 shadow-2xl flex items-center justify-center group ${
                 isRecording
-                  ? 'h-[55vh] xs:h-[59vh] sm:h-[65vh] max-h-[660px] max-w-[320px] xs:max-w-[360px] sm:max-w-[400px] border-rose-500 shadow-rose-950/50'
-                  : 'h-[44vh] xs:h-[48vh] sm:h-[52vh] max-h-[540px] max-w-[270px] xs:max-w-[310px] sm:max-w-[350px] border-slate-800'
-              } rounded-xl overflow-hidden bg-black border-2 shadow-2xl flex items-center justify-center group`}
+                  ? 'border-rose-500 shadow-rose-950/50'
+                  : 'border-slate-800'
+              }`}
             >
               <canvas
                 ref={canvasRef}
@@ -1157,7 +979,7 @@ export default function App() {
                 className="w-full h-full object-contain"
               />
 
-              {/* TOP-RIGHT CORNER ACTION BUTTONS: «СБРОС» и «СОХРАНИТЬ» */}
+              {/* TOP-RIGHT CORNER ACTION BUTTONS: «СТОП» и «СОХРАНИТЬ» */}
               <div className="absolute top-2 right-2 flex items-center gap-1 z-30">
                 {isRecording && (
                   <>
@@ -1168,10 +990,10 @@ export default function App() {
                         cancelRecording();
                       }}
                       className="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-rose-300 border border-rose-500/50 text-[10px] font-bold flex items-center gap-1 shadow-lg backdrop-blur transition active:scale-95 cursor-pointer"
-                      title="Сбросить запись (без сохранения)"
+                      title={t.cancelRecordingTooltip}
                     >
                       <Square className="w-3 h-3 fill-rose-400 text-rose-400" />
-                      <span>СТОП</span>
+                      <span>{t.buttonStop}</span>
                     </button>
 
                     <button
@@ -1181,10 +1003,10 @@ export default function App() {
                         stopRecordingAndDownload();
                       }}
                       className="px-2.5 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-lg backdrop-blur transition active:scale-95 cursor-pointer"
-                      title="Сохранить и скачать клип"
+                      title={t.saveClipTooltip}
                     >
                       <Download className="w-3 h-3" />
-                      <span>СОХРАНИТЬ</span>
+                      <span>{t.buttonSave}</span>
                     </button>
                   </>
                 )}
@@ -1199,10 +1021,10 @@ export default function App() {
                       downloadBlob(clip.blob, exportName);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-lg backdrop-blur transition active:scale-95 cursor-pointer"
-                    title="Скачать последнюю запись"
+                    title={t.downloadLastRecording}
                   >
                     <Download className="w-3 h-3" />
-                    <span>СОХРАНИТЬ</span>
+                    <span>{t.buttonSave}</span>
                   </button>
                 )}
               </div>
@@ -1232,7 +1054,7 @@ export default function App() {
                 <div className="absolute inset-0 pointer-events-none pt-[10%] pb-[20%] pl-2 pr-[16%] z-10">
                   <div className="w-full h-full border border-dashed border-amber-400/60 rounded flex flex-col justify-start p-1.5 bg-amber-400/5">
                     <span className="text-[8px] font-mono text-amber-400 font-bold tracking-tight">
-                      ⚡ БЕЗОПАСНАЯ ЗОНА
+                      {t.safeZoneBadge}
                     </span>
                   </div>
                 </div>
@@ -1242,12 +1064,12 @@ export default function App() {
               <div className="absolute top-2 left-2 flex flex-col gap-1 pointer-events-none z-20">
                 {isRecording && (
                   <span className="bg-rose-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded font-mono shadow">
-                    ● REC {formatTime(recordingTime)}
+                    ● {t.statusRec} {formatTime(recordingTime)}
                   </span>
                 )}
                 {isRecordingPaused && (
                   <span className="bg-amber-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded font-mono shadow">
-                    ПАУЗА
+                    {t.statusPause}
                   </span>
                 )}
               </div>
@@ -1264,7 +1086,7 @@ export default function App() {
                 9:16
               </div>
 
-              {/* Status Notifications: Displayed ONLY in the bottom area of the vertical preview */}
+              {/* Status Notifications */}
               {notification && (
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-indigo-500/80 shadow-2xl rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-xs text-white max-w-[90%] pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150 backdrop-blur">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -1274,9 +1096,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* SECTION 2: 16:9 HORIZONTAL VIDEO (100% Full Width of mobile screen, BORDERLESS) */}
+          {/* SECTION 2: 16:9 HORIZONTAL VIDEO */}
           <div className="w-full lg:col-span-7 order-2 flex flex-col items-center bg-black lg:bg-slate-900 lg:rounded-2xl border-0 lg:border border-slate-800/80 overflow-hidden">
-            {/* 100% Full Width Viewport Container (Edge-to-Edge on mobile, No Card Borders) */}
             <div
               ref={sourceContainerRef}
               onPointerMove={(e) => handlePointerMove(e, 'source')}
@@ -1289,40 +1110,53 @@ export default function App() {
             >
               {videoSrc ? (
                 <>
-                  <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    playsInline
-                    loop
-                    muted={isMuted}
-                    onLoadedMetadata={handleVideoLoadedMetadata}
-                    onLoadedData={handleVideoLoadedMetadata}
-                    onDurationChange={() => {
-                      if (videoRef.current) {
-                        const d = videoRef.current.duration;
-                        if (Number.isFinite(d) && d > 0) {
-                          setDuration(d);
+                  {mediaType === 'image' ? (
+                    <img
+                      ref={imageRef}
+                      src={videoSrc}
+                      alt={videoName || 'Horizontal source'}
+                      onLoad={(e) => {
+                        const target = e.currentTarget;
+                        setVideoDimensions({
+                          width: target.naturalWidth || 1920,
+                          height: target.naturalHeight || 1080
+                        });
+                        setIsImageLoaded(true);
+                        setIsVideoLoaded(true);
+                      }}
+                      className="w-full h-full object-contain pointer-events-none select-none"
+                    />
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      playsInline
+                      loop
+                      muted={isMuted}
+                      onLoadedMetadata={handleVideoLoadedMetadata}
+                      onLoadedData={handleVideoLoadedMetadata}
+                      onDurationChange={() => {
+                        if (videoRef.current) {
+                          const d = videoRef.current.duration;
+                          if (Number.isFinite(d) && d > 0) {
+                            setDuration(d);
+                          }
                         }
-                      }
-                    }}
-                    onTimeUpdate={() => {
-                      if (videoRef.current && !isScrubbingRef.current) {
-                        setCurrentTime(videoRef.current.currentTime);
-                      }
-                    }}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onEnded={() => setIsPlaying(false)}
-                    onError={() => {
-                      const errCode = videoRef.current?.error?.code;
-                      const errMsg = videoRef.current?.error?.message;
-                      if (errCode || errMsg) {
-                        console.error('Video playback error:', errCode, errMsg);
-                      }
-                      setErrorMessage('Не удалось воспроизвести данный видеофайл. Проверьте формат.');
-                    }}
-                    className="w-full h-full object-contain pointer-events-none"
-                  />
+                      }}
+                      onTimeUpdate={() => {
+                        if (videoRef.current && !isScrubbingRef.current) {
+                          setCurrentTime(videoRef.current.currentTime);
+                        }
+                      }}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onEnded={() => setIsPlaying(false)}
+                      onError={() => {
+                        setErrorMessage(t.playbackError);
+                      }}
+                      className="w-full h-full object-contain pointer-events-none select-none"
+                    />
+                  )}
 
                   {/* Target Cursor Indicator */}
                   {isTrackingActive && (
@@ -1347,7 +1181,6 @@ export default function App() {
                         : 'border-rose-500 shadow-[0_0_22px_rgba(239,68,68,0.6)]'
                     }`}
                   >
-                    {/* Inner Tint */}
                     <div
                       className={`absolute inset-0 transition-colors ${
                         !isRecording
@@ -1364,7 +1197,7 @@ export default function App() {
                     <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-white" />
                     <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-white" />
 
-                    {/* CENTER TARGET BUTTON (ГОТОВ / REC / ПАУЗА) - Optimized for instant touch */}
+                    {/* CENTER TARGET BUTTON */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1394,16 +1227,16 @@ export default function App() {
                       }`}
                       title={
                         !isRecording
-                          ? 'Нажмите для старта записи'
+                          ? t.targetTooltipStart
                           : isRecordingPaused
-                          ? 'Нажмите для возобновления'
-                          : 'Нажмите для паузы'
+                          ? t.targetTooltipResume
+                          : t.targetTooltipPause
                       }
                     >
                       <Crosshair className="w-6 h-6 stroke-[2.5]" />
                     </button>
 
-                    {/* Viewfinder Status Badge - Tappable for quick control */}
+                    {/* Viewfinder Status Badge */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1435,29 +1268,47 @@ export default function App() {
                       {!isRecording ? (
                         <>
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                          <span>ГОТОВ</span>
+                          <span>{t.statusReady}</span>
                         </>
                       ) : isRecordingPaused ? (
                         <>
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-900" />
-                          <span>ПАУЗА</span>
+                          <span>{t.statusPause}</span>
                         </>
                       ) : (
                         <>
                           <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          <span>REC {formatTime(recordingTime)}</span>
+                          <span>{t.statusRec} {formatTime(recordingTime)}</span>
                         </>
                       )}
                     </button>
                   </div>
                 </>
               ) : (
-                <label className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center text-slate-600 cursor-pointer overflow-hidden">
-                  <Film className="w-10 h-10 stroke-[1.2] mb-1.5 opacity-40 text-slate-400 pointer-events-none" />
-                  <p className="text-xs font-medium text-slate-400 pointer-events-none">Нажмите сюда или «Загрузить видео» вверху</p>
+                <label
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleMediaFile(file);
+                  }}
+                  className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center text-slate-600 cursor-pointer overflow-hidden group"
+                >
+                  <div className="flex items-center gap-2 mb-2 text-slate-400 group-hover:text-indigo-400 transition-colors pointer-events-none">
+                    <Film className="w-8 h-8 stroke-[1.4] opacity-70" />
+                    <span className="text-sm font-bold opacity-30">+</span>
+                    <ImageIcon className="w-8 h-8 stroke-[1.4] opacity-70" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-300 pointer-events-none">{t.dropOrClickToUpload}</p>
+                  <p className="text-[10px] text-slate-500 pointer-events-none mt-1 max-w-sm">{t.dropZoneSubtitle}</p>
                   <input
+                    ref={fileInputRef}
                     type="file"
-                    accept="video/*"
+                    accept="video/*,image/*"
                     onChange={handleFileUpload}
                     className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
                   />
@@ -1465,85 +1316,87 @@ export default function App() {
               )}
             </div>
 
-            {/* SECTION 3: THIN TIMELINE SCRUBBER TRACK DIRECTLY BELOW 16:9 VIDEO */}
-            <div className="w-full bg-slate-900/95 backdrop-blur border-t border-slate-800 px-2.5 py-1.5 flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={togglePlay}
-                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-white transition active:scale-95 shrink-0"
-                  title={isPlaying ? 'Пауза' : 'Воспроизведение'}
-                >
-                  {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
-                </button>
+            {/* SECTION 3: THIN TIMELINE SCRUBBER TRACK FOR VIDEO (ONLY WHEN VIDEO FILE IS LOADED) */}
+            {mediaType === 'video' && videoSrc ? (
+              <div className="w-full bg-slate-900/95 backdrop-blur border-t border-slate-800 px-2.5 py-1.5 flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={togglePlay}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-white transition active:scale-95 shrink-0 cursor-pointer"
+                    title={isPlaying ? t.pause : t.play}
+                  >
+                    {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+                  </button>
 
-                <button
-                  onClick={() => {
-                    if (!videoRef.current) return;
-                    videoRef.current.currentTime = 0;
-                  }}
-                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition active:scale-95 shrink-0"
-                  title="С начала"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
+                  <button
+                    onClick={() => {
+                      if (!videoRef.current) return;
+                      videoRef.current.currentTime = 0;
+                    }}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition active:scale-95 shrink-0 cursor-pointer"
+                    title={t.fromStart}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
 
-                <span className="text-[10px] font-mono text-slate-400 shrink-0 w-9 text-right">
-                  {formatTime(currentTime)}
-                </span>
+                  <span className="text-[10px] font-mono text-slate-400 shrink-0 w-9 text-right">
+                    {formatTime(currentTime)}
+                  </span>
 
-                {/* Thin Scrubber Slider */}
-                <input
-                  type="range"
-                  min={0}
-                  max={duration > 0 && Number.isFinite(duration) ? duration : 100}
-                  step={0.05}
-                  value={currentTime}
-                  onPointerDown={() => {
-                    isScrubbingRef.current = true;
-                  }}
-                  onPointerUp={() => {
-                    isScrubbingRef.current = false;
-                  }}
-                  onTouchStart={() => {
-                    isScrubbingRef.current = true;
-                  }}
-                  onTouchEnd={() => {
-                    isScrubbingRef.current = false;
-                  }}
-                  onInput={(e) => {
-                    const newTime = parseFloat((e.target as HTMLInputElement).value);
-                    if (Number.isFinite(newTime)) {
-                      setCurrentTime(newTime);
-                      if (videoRef.current) videoRef.current.currentTime = newTime;
-                    }
-                  }}
-                  onChange={(e) => {
-                    const newTime = parseFloat(e.target.value);
-                    if (Number.isFinite(newTime)) {
-                      setCurrentTime(newTime);
-                      if (videoRef.current) videoRef.current.currentTime = newTime;
-                    }
-                  }}
-                  className="flex-1 h-1.5 bg-slate-800/90 rounded-lg appearance-none cursor-pointer accent-indigo-500 border border-slate-700/60"
-                />
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration > 0 && Number.isFinite(duration) ? duration : 100}
+                    step={0.05}
+                    value={currentTime}
+                    onPointerDown={() => {
+                      isScrubbingRef.current = true;
+                    }}
+                    onPointerUp={() => {
+                      isScrubbingRef.current = false;
+                    }}
+                    onTouchStart={() => {
+                      isScrubbingRef.current = true;
+                    }}
+                    onTouchEnd={() => {
+                      isScrubbingRef.current = false;
+                    }}
+                    onInput={(e) => {
+                      const newTime = parseFloat((e.target as HTMLInputElement).value);
+                      if (Number.isFinite(newTime)) {
+                        setCurrentTime(newTime);
+                        if (videoRef.current) videoRef.current.currentTime = newTime;
+                      }
+                    }}
+                    onChange={(e) => {
+                      const newTime = parseFloat(e.target.value);
+                      if (Number.isFinite(newTime)) {
+                        setCurrentTime(newTime);
+                        if (videoRef.current) videoRef.current.currentTime = newTime;
+                      }
+                    }}
+                    className="flex-1 h-1.5 bg-slate-800/90 rounded-lg appearance-none cursor-pointer accent-indigo-500 border border-slate-700/60"
+                  />
 
-                <span className="text-[10px] font-mono text-slate-400 shrink-0 w-9">
-                  {formatTime(duration)}
-                </span>
+                  <span className="text-[10px] font-mono text-slate-400 shrink-0 w-9">
+                    {formatTime(duration)}
+                  </span>
 
-                <button
-                  onClick={() => {
-                    if (!videoRef.current) return;
-                    const nextMuted = !isMuted;
-                    setIsMuted(nextMuted);
-                    videoRef.current.muted = nextMuted;
-                  }}
-                  className="text-slate-400 hover:text-white shrink-0"
-                >
-                  {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
-                </button>
+                  <button
+                    onClick={() => {
+                      if (!videoRef.current) return;
+                      const nextMuted = !isMuted;
+                      setIsMuted(nextMuted);
+                      videoRef.current.muted = nextMuted;
+                    }}
+                    className="text-slate-400 hover:text-white shrink-0 cursor-pointer"
+                    title={isMuted ? t.unmute : t.mute}
+                  >
+                    {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
 
           </div>
 
@@ -1553,11 +1406,11 @@ export default function App() {
         <div className="w-full order-3 mt-1">
           <button
             onClick={() => setShowToolPanels(!showToolPanels)}
-            className="w-full py-2 px-3 bg-slate-900/80 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-between hover:bg-slate-800 transition"
+            className="w-full py-2 px-3 bg-slate-900/80 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-between hover:bg-slate-800 transition cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Параметры зума, плавности LERP и сетки</span>
+              <span>{t.settingsToggleTitle}</span>
             </div>
             {showToolPanels ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -1570,7 +1423,7 @@ export default function App() {
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <ZoomIn className="w-3.5 h-3.5 text-indigo-400" />
-                    Масштаб (Zoom)
+                    {t.zoomTitle}
                   </span>
                   <span className="font-mono text-indigo-400 bg-slate-950 px-1.5 py-0.5 rounded text-[11px] border border-slate-800">
                     {displayZoom.toFixed(2)}x
@@ -1590,7 +1443,7 @@ export default function App() {
                     <button
                       key={zVal}
                       onClick={() => handleZoomChange(zVal)}
-                      className={`px-1.5 py-0.5 rounded font-mono transition ${
+                      className={`px-1.5 py-0.5 rounded font-mono transition cursor-pointer ${
                         Math.abs(displayZoom - zVal) < 0.05
                           ? 'bg-indigo-600 text-white font-bold'
                           : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -1603,37 +1456,37 @@ export default function App() {
                 {/* Wheel Zoom Direction */}
                 <div className="pt-1 mt-0.5 flex flex-col gap-1 border-t border-slate-800/60">
                   <div className="flex items-center justify-between text-[10px] text-slate-400">
-                    <span>Колесо мыши:</span>
+                    <span>{t.mouseWheelTitle}</span>
                     <span className="text-indigo-400 font-mono font-medium">
-                      {wheelDirection === 'forward-plus' ? 'От себя [+]' : 'От себя [-]'}
+                      {wheelDirection === 'forward-plus' ? t.wheelAwayPlus : t.wheelAwayMinus}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-[10px]">
                     <button
                       onClick={() => {
                         setWheelDirection('forward-plus');
-                        showToast('Колесо: От себя [+] приблизить, К себе [-] отдалить');
+                        showToast(t.wheelAwayPlusToast);
                       }}
-                      className={`py-1 px-1.5 rounded transition text-center font-medium ${
+                      className={`py-1 px-1.5 rounded transition text-center font-medium cursor-pointer ${
                         wheelDirection === 'forward-plus'
                           ? 'bg-indigo-600 text-white font-semibold'
                           : 'bg-slate-800/80 text-slate-400 hover:text-white'
                       }`}
                     >
-                      От себя [+]
+                      {t.wheelAwayPlus}
                     </button>
                     <button
                       onClick={() => {
                         setWheelDirection('forward-minus');
-                        showToast('Колесо: От себя [-] отдалить, К себе [+] приблизить');
+                        showToast(t.wheelAwayMinusToast);
                       }}
-                      className={`py-1 px-1.5 rounded transition text-center font-medium ${
+                      className={`py-1 px-1.5 rounded transition text-center font-medium cursor-pointer ${
                         wheelDirection === 'forward-minus'
                           ? 'bg-indigo-600 text-white font-semibold'
                           : 'bg-slate-800/80 text-slate-400 hover:text-white'
                       }`}
                     >
-                      От себя [-]
+                      {t.wheelAwayMinus}
                     </button>
                   </div>
                 </div>
@@ -1644,7 +1497,7 @@ export default function App() {
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                    Плавность LERP
+                    {t.lerpTitle}
                   </span>
                   <span className="font-mono text-indigo-400 bg-slate-950 px-1.5 py-0.5 rounded text-[11px] border border-slate-800">
                     {lerpFactor}
@@ -1661,15 +1514,15 @@ export default function App() {
                 />
                 <div className="grid grid-cols-2 gap-1 text-[10px]">
                   {[
-                    { val: 0.04, label: 'Кино' },
-                    { val: 0.1, label: 'Оптимал' },
-                    { val: 0.2, label: 'Динамика' },
-                    { val: 0.35, label: 'Быстро' }
+                    { val: 0.04, label: t.lerpCinema },
+                    { val: 0.1, label: t.lerpOptimal },
+                    { val: 0.2, label: t.lerpDynamic },
+                    { val: 0.35, label: t.lerpFast }
                   ].map((item) => (
                     <button
                       key={item.val}
                       onClick={() => setLerpFactor(item.val)}
-                      className={`py-1 px-1 rounded transition text-center ${
+                      className={`py-1 px-1 rounded transition text-center cursor-pointer ${
                         Math.abs(lerpFactor - item.val) < 0.02
                           ? 'bg-indigo-600 text-white font-bold'
                           : 'bg-slate-800/80 text-slate-400 hover:text-white'
@@ -1686,43 +1539,43 @@ export default function App() {
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                    Вывод и Сетка
+                    {t.outputAndGridTitle}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-1 text-[10px]">
                   <button
                     onClick={() => setResolution(resolution === '1080p' ? '720p' : '1080p')}
-                    className="py-1 px-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-center"
+                    className="py-1 px-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-center cursor-pointer"
                   >
-                    Формат: <span className="text-indigo-400 font-bold">{resolution}</span>
+                    {t.formatLabel}: <span className="text-indigo-400 font-bold">{resolution}</span>
                   </button>
                   <button
                     onClick={() => setFps(fps === 60 ? 30 : 60)}
-                    className="py-1 px-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-center"
+                    className="py-1 px-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-center cursor-pointer"
                   >
-                    FPS: <span className="text-indigo-400 font-bold">{fps}</span>
+                    {t.fpsLabel}: <span className="text-indigo-400 font-bold">{fps}</span>
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-1 pt-0.5">
                   <button
                     onClick={() => setShowGuides(!showGuides)}
-                    className={`py-1 px-2 rounded text-[10px] font-medium border transition ${
+                    className={`py-1 px-2 rounded text-[10px] font-medium border transition cursor-pointer ${
                       showGuides
                         ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                         : 'bg-slate-800/80 text-slate-400 border-slate-700'
                     }`}
                   >
-                    {showGuides ? '✓ Сетка 3х3 включена' : 'Сетка 3х3 выключена'}
+                    {showGuides ? t.grid3x3On : t.grid3x3Off}
                   </button>
                   <button
                     onClick={() => setShowSafeZone(!showSafeZone)}
-                    className={`py-1 px-2 rounded text-[10px] font-medium border transition ${
+                    className={`py-1 px-2 rounded text-[10px] font-medium border transition cursor-pointer ${
                       showSafeZone
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                         : 'bg-slate-800/80 text-slate-400 border-slate-700'
                     }`}
                   >
-                    {showSafeZone ? '✓ Safe Zone (Reels/TikTok)' : 'Safe Zone выключена'}
+                    {showSafeZone ? t.safeZoneOn : t.safeZoneOff}
                   </button>
                 </div>
               </div>
@@ -1737,7 +1590,7 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-xs text-white">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Записанные клипы ({recordedClips.length})</span>
+                <span>{t.recordedClipsTitle} ({recordedClips.length})</span>
               </div>
             </div>
 
@@ -1748,8 +1601,8 @@ export default function App() {
                   className="rounded-xl bg-slate-950 border border-slate-800 p-2.5 flex flex-col gap-2"
                 >
                   <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span className="font-semibold text-slate-200 truncate max-w-[170px]" title={clip.filename || `Клип #${recordedClips.length - idx}`}>
-                      {clip.filename || `Клип #${recordedClips.length - idx}`}
+                    <span className="font-semibold text-slate-200 truncate max-w-[170px]" title={clip.filename || `Clip #${recordedClips.length - idx}`}>
+                      {clip.filename || `Clip #${recordedClips.length - idx}`}
                     </span>
                     <span className="font-mono text-[10px]">{clip.timestamp}</span>
                   </div>
@@ -1764,7 +1617,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-0.5">
-                    <span>Длительность: {formatTime(clip.duration)}</span>
+                    <span>{t.durationLabel}: {formatTime(clip.duration)}</span>
                     <span className="text-emerald-400 font-semibold">{clip.size}</span>
                   </div>
 
@@ -1777,7 +1630,7 @@ export default function App() {
                     className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Скачать файл</span>
+                    <span>{t.downloadFile}</span>
                   </button>
                 </div>
               ))}
@@ -1785,15 +1638,26 @@ export default function App() {
           </div>
         )}
 
-        {/* SECTION 6: INSTRUCTIONS CARD */}
-        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 text-xs text-slate-400 flex flex-col gap-1.5 order-5 mt-1">
-          <div className="flex items-center gap-2 font-bold text-slate-300">
-            <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Памятка пользователю</span>
+        {/* SECTION 6: INSTRUCTIONS & QUICK LAUNCH CARD */}
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 text-xs text-slate-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 order-5 mt-1">
+          <div className="flex items-start gap-2.5">
+            <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-slate-300 block mb-0.5">{t.userMemoTitle}</span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {t.userMemoDesc}
+              </p>
+            </div>
           </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            При запуске записи верхнее меню с логотипом прячется за экран, давая максимальную высоту для вертикального 9:16 превью. Оба видео одновременно видны на экране телефона!
-          </p>
+
+          <button
+            type="button"
+            onClick={() => setShowTutorialModal(true)}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{t.understand30s}</span>
+          </button>
         </div>
       </main>
 
@@ -1803,7 +1667,15 @@ export default function App() {
         <span>VidVert • Dynamic 9:16 Video Reframe • 100% Offline & Local</span>
       </footer>
 
-      <OfflineBanner />
+      {/* Interactive 30-Second Tutorial Modal */}
+      <InteractiveTutorialModal
+        isOpen={showTutorialModal}
+        onClose={handleCloseTutorial}
+        onUploadClick={() => {
+          fileInputRef.current?.click();
+        }}
+        lang={currentLang}
+      />
     </div>
   );
 }
