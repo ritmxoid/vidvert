@@ -230,10 +230,6 @@ export default function App() {
   const handleMediaFile = (file: File) => {
     if (!file) return;
 
-    if (videoSrc && videoSrc.startsWith('blob:')) {
-      URL.revokeObjectURL(videoSrc);
-    }
-
     const isImg = file.type.startsWith('image/');
     setMediaType(isImg ? 'image' : 'video');
 
@@ -277,7 +273,6 @@ export default function App() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleMediaFile(file);
-    e.target.value = '';
   };
 
   // Video metadata loaded
@@ -338,25 +333,34 @@ export default function App() {
     }
 
     if (!videoRef.current) return;
+    const v = videoRef.current;
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().catch(() => {});
     }
 
-    if (videoRef.current.paused) {
-      if (videoRef.current.currentTime >= (duration - 0.2) && duration > 0) {
-        videoRef.current.currentTime = 0;
+    if (v.paused || v.ended) {
+      if (v.currentTime >= (duration - 0.2) && duration > 0) {
+        v.currentTime = 0;
       }
-      videoRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
-          console.warn('Playback error, retrying:', err);
-          if (videoRef.current) {
-            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-          }
+      const p = v.play();
+      if (p !== undefined) {
+        p.then(() => {
+          setIsPlaying(true);
+          setErrorMessage(null);
+        }).catch((err) => {
+          console.warn('Playback error, retrying muted:', err);
+          v.muted = true;
+          setIsMuted(true);
+          v.play()
+            .then(() => {
+              setIsPlaying(true);
+              setErrorMessage(null);
+            })
+            .catch(() => {});
         });
+      }
     } else {
-      videoRef.current.pause();
+      v.pause();
       setIsPlaying(false);
     }
   };
@@ -563,10 +567,13 @@ export default function App() {
       const video = videoRef.current;
       const img = imageRef.current;
 
+      const isVideoReady = Boolean(video && (video.readyState >= 1 || video.videoWidth > 0));
+      const isImageReady = Boolean(img && img.complete && img.naturalWidth > 0);
+
       const sourceEl: CanvasImageSource | null =
         mediaType === 'image'
-          ? (img && img.complete && img.naturalWidth > 0 ? img : null)
-          : (video && video.readyState >= 2 ? video : null);
+          ? (isImageReady ? img : null)
+          : (isVideoReady ? video : null);
 
       if (sourceEl) {
         const sw =
@@ -771,7 +778,17 @@ export default function App() {
       }, 1000);
 
       if (videoRef.current) {
-        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        const p = videoRef.current.play();
+        if (p !== undefined) {
+          p.then(() => setIsPlaying(true)).catch((err) => {
+            console.warn('Resume play error, retrying muted:', err);
+            if (videoRef.current) {
+              videoRef.current.muted = true;
+              setIsMuted(true);
+              videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+            }
+          });
+        }
       }
       showToast(t.recordingResumed);
     }
@@ -1097,7 +1114,7 @@ export default function App() {
           </div>
 
           {/* SECTION 2: 16:9 HORIZONTAL VIDEO */}
-          <div className="w-full lg:col-span-7 order-2 flex flex-col items-center bg-black lg:bg-slate-900 lg:rounded-2xl border-0 lg:border border-slate-800/80 overflow-hidden">
+          <div className="w-full shrink-0 lg:col-span-7 order-2 flex flex-col items-center bg-black lg:bg-slate-900 lg:rounded-2xl border-0 lg:border border-slate-800/80">
             <div
               ref={sourceContainerRef}
               onPointerMove={(e) => handlePointerMove(e, 'source')}
@@ -1106,7 +1123,7 @@ export default function App() {
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               style={{ touchAction: 'none', overscrollBehavior: 'none' }}
-              className="relative aspect-video w-full bg-black cursor-crosshair group"
+              className="relative aspect-video w-full bg-black cursor-crosshair group overflow-hidden"
             >
               {videoSrc ? (
                 <>
@@ -1151,7 +1168,11 @@ export default function App() {
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
                       onEnded={() => setIsPlaying(false)}
-                      onError={() => {
+                      onError={(e) => {
+                        const err = e.currentTarget.error;
+                        // Aborted requests (code 1) happen during pause/seek and are not real playback errors
+                        if (!err || err.code === 1) return;
+                        console.warn('Video format playback error code:', err.code, err.message);
                         setErrorMessage(t.playbackError);
                       }}
                       className="w-full h-full object-contain pointer-events-none select-none"
@@ -1208,16 +1229,6 @@ export default function App() {
                           togglePauseRecording();
                         }
                       }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        if (!isRecording) {
-                          startRecording();
-                        } else {
-                          togglePauseRecording();
-                        }
-                      }}
                       className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto min-w-[48px] min-h-[48px] p-3 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xl border-2 border-white/50 z-20 cursor-pointer ${
                         !isRecording
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/40'
@@ -1241,16 +1252,6 @@ export default function App() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!isRecording) {
-                          startRecording();
-                        } else {
-                          togglePauseRecording();
-                        }
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
                         if (!isRecording) {
                           startRecording();
                         } else {
