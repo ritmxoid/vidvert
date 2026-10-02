@@ -1,195 +1,308 @@
 /**
- * EBML Duration Patcher для WebM файлов от MediaRecorder.
- * Внедряет точные метаданные длительности (Duration 0x4489) в заголовок Segment Info (0x1549A966),
- * благодаря чему галереи, мессенджеры и плееры (Google Photos, Samsung Gallery, Apple Files, Telegram, WhatsApp)
- * гарантированно и корректно отображают общую длину и таймлайн перемотки.
+ * Pure Browser TypeScript EBML WebM Seekable & Duration Generator.
+ * Works 100% natively in the browser without Node.js 'Buffer' or external dependencies.
+ * Converts streaming WebM blobs from MediaRecorder into seekable, indexed video files:
+ * 1. Injects exact duration into Info segment
+ * 2. Scans clusters to build keyframe Cues index
+ * 3. Builds SeekHead table of contents
+ * Guarantees mobile galleries (Google Photos, Samsung Gallery, iOS) and all media
+ * players accurately show the full duration and enable seamless scrubbing.
  */
 
-function readVint(
-  u8: Uint8Array,
-  offset: number
-): { val: number; len: number; isUnknown: boolean } | null {
-  if (offset >= u8.length) return null;
-  const first = u8[offset];
-  let len = 1;
-  let mask = 0x80;
-  while (len <= 8 && (first & mask) === 0) {
-    len++;
-    mask >>= 1;
+// Helper to encode EBML VINT (Variable Length Integer) for data sizes
+function encodeVint(val: number): Uint8Array {
+  if (val < 0x7f) {
+    return new Uint8Array([0x80 | val]);
+  } else if (val < 0x3fff) {
+    return new Uint8Array([0x40 | (val >> 8), val & 0xff]);
+  } else if (val < 0x1fffff) {
+    return new Uint8Array([0x20 | (val >> 16), (val >> 8) & 0xff, val & 0xff]);
+  } else if (val < 0x0fffffff) {
+    return new Uint8Array([
+      0x10 | (val >> 24),
+      (val >> 16) & 0xff,
+      (val >> 8) & 0xff,
+      val & 0xff
+    ]);
+  } else {
+    // 5-8 byte integers if ever needed
+    const bytes: number[] = [];
+    let temp = val;
+    while (temp > 0) {
+      bytes.unshift(temp & 0xff);
+      temp = Math.floor(temp / 256);
+    }
+    const len = bytes.length + 1;
+    const marker = 1 << (8 - len);
+    return new Uint8Array([marker, ...bytes]);
   }
-  if (len > 8) return null;
-  let val = first & (mask - 1);
-  for (let i = 1; i < len; i++) {
-    val = (val * 256) + u8[offset + i];
-  }
-  const isUnknown =
-    first === 0x01 && len === 8 && Array.from(u8.subarray(offset + 1, offset + 8)).every((b) => b === 0xff);
-  return { val, len, isUnknown };
 }
 
-function encodeVint(val: number, minLen = 1): Uint8Array {
-  let len = minLen;
-  if (val >= 0x7f && len === 1) len = 2;
-  if (val >= 0x3fff && len === 2) len = 3;
-  if (val >= 0x1fffff && len === 3) len = 4;
+// Encodes an EBML element with given ID and payload
+function encodeElement(idBytes: number[], payload: Uint8Array): Uint8Array {
+  const sizeVint = encodeVint(payload.length);
+  const result = new Uint8Array(idBytes.length + sizeVint.length + payload.length);
+  result.set(idBytes, 0);
+  result.set(sizeVint, idBytes.length);
+  result.set(payload, idBytes.length + sizeVint.length);
+  return result;
+}
 
-  const buf = new Uint8Array(len);
+// Encodes an unsigned integer in big-endian bytes
+function encodeUint(val: number): Uint8Array {
+  if (val === 0) return new Uint8Array([0]);
+  const bytes: number[] = [];
   let temp = val;
-  for (let i = len - 1; i > 0; i--) {
-    buf[i] = temp & 0xff;
+  while (temp > 0) {
+    bytes.unshift(temp & 0xff);
     temp = Math.floor(temp / 256);
   }
-  buf[0] = (1 << (8 - len)) | (temp & ((1 << (8 - len)) - 1));
-  return buf;
+  return new Uint8Array(bytes);
+}
+
+// Encodes IEEE-754 64-bit float
+function encodeFloat64(val: number): Uint8Array {
+  const buf = new ArrayBuffer(8);
+  new DataView(buf).setFloat64(0, val, false);
+  return new Uint8Array(buf);
+}
+
+// Concat multiple Uint8Arrays
+function concatArrays(arrays: Uint8Array[]): Uint8Array {
+  const totalLen = arrays.reduce((acc, a) => acc + a.length, 0);
+  const result = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const arr of arrays) {
+    result.set(arr, offset);
+    offset += arr.length;
+  }
+  return result;
+}
+
+// Read VINT from buffer
+function readVint(bytes: Uint8Array, offset: number): { value: number; length: number } | null {
+  if (offset >= bytes.length) return null;
+  const b0 = bytes[offset];
+  let length = 1;
+  let mask = 0x80;
+  while ((b0 & mask) === 0 && length < 8) {
+    length++;
+    mask >>= 1;
+  }
+  let value = b0 & (mask - 1);
+  for (let i = 1; i < length; i++) {
+    if (offset + i >= bytes.length) return null;
+    value = value * 256 + bytes[offset + i];
+  }
+  return { value, length };
+}
+
+interface CuePoint {
+  timecode: number;
+  clusterOffset: number;
 }
 
 /**
- * Быстрый и безопасный патчер длительности для WebM blob.
- * @param rawBlob Исходный WebM Blob от MediaRecorder
- * @param targetDurationSec Длительность в секундах (например, 14.5)
+ * Patches WebM recording Blob with full SeekHead, Cues and Duration index.
  */
-export async function safeFixWebm(
-  rawBlob: Blob,
-  targetDurationSec?: number
-): Promise<Blob> {
-  if (!rawBlob || rawBlob.size < 40 || !targetDurationSec || targetDurationSec <= 0) {
-    return rawBlob;
+export async function patchWebmDuration(blob: Blob, durationMs: number): Promise<Blob> {
+  if (!blob || blob.size === 0 || durationMs <= 0) {
+    return blob;
   }
 
   try {
-    const arrayBuffer = await rawBlob.arrayBuffer();
-    const u8 = new Uint8Array(arrayBuffer);
-    const view = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
 
-    // 1. Проверяем заголовок EBML (0x1A45DFA3)
-    if (view.getUint32(0) !== 0x1a45dfa3) {
-      return rawBlob;
-    }
-    const ebmlLen = readVint(u8, 4);
-    if (!ebmlLen) return rawBlob;
-
-    // 2. Ищем контейнер Segment (0x18538067)
-    const segOffset = 4 + ebmlLen.len + ebmlLen.val;
-    if (segOffset + 4 >= u8.length || view.getUint32(segOffset) !== 0x18538067) {
-      return rawBlob;
+    // 1. Locate EBML header: 0x1A 0x45 0xDF 0xA3
+    if (bytes[0] !== 0x1a || bytes[1] !== 0x45 || bytes[2] !== 0xdf || bytes[3] !== 0xa3) {
+      console.warn('[WebM] Invalid EBML header signature');
+      return blob;
     }
 
-    const segLenPos = segOffset + 4;
-    const segLen = readVint(u8, segLenPos);
-    if (!segLen) return rawBlob;
+    const ebmlLen = readVint(bytes, 4);
+    if (!ebmlLen) return blob;
+    const ebmlHeaderEnd = 4 + ebmlLen.length + ebmlLen.value;
 
-    const segHeaderEnd = segLenPos + segLen.len;
-    let pos = segHeaderEnd;
-    let infoPos = -1;
-    let infoLen: { val: number; len: number; isUnknown: boolean } | null = null;
-
-    // 3. Ищем Segment Info (0x1549A966)
-    const searchLimit = Math.min(u8.length - 8, segHeaderEnd + 8192);
-    while (pos < searchLimit) {
-      if (view.getUint32(pos) === 0x1549a966) {
-        infoPos = pos;
-        infoLen = readVint(u8, pos + 4);
+    // 2. Locate Segment: 0x18 0x53 0x80 0x67
+    let segmentPos = -1;
+    for (let i = ebmlHeaderEnd; i < Math.min(bytes.length - 4, ebmlHeaderEnd + 64); i++) {
+      if (
+        bytes[i] === 0x18 &&
+        bytes[i + 1] === 0x53 &&
+        bytes[i + 2] === 0x80 &&
+        bytes[i + 3] === 0x67
+      ) {
+        segmentPos = i;
         break;
       }
-      pos++;
     }
+    if (segmentPos === -1) return blob;
 
-    if (infoPos === -1 || !infoLen) {
-      return rawBlob;
-    }
+    const segmentLen = readVint(bytes, segmentPos + 4);
+    if (!segmentLen) return blob;
+    const segmentPayloadStart = segmentPos + 4 + segmentLen.length;
 
-    const infoLenPos = infoPos + 4;
-    const infoDataStart = infoLenPos + infoLen.len;
-    const infoDataEnd = infoDataStart + infoLen.val;
+    // 3. Scan for Info (0x1549A966), Tracks (0x1654AE6B), and Clusters (0x1F43B675)
+    let infoData: Uint8Array | null = null;
+    let tracksData: Uint8Array | null = null;
+    let firstClusterPos = -1;
+    const cues: CuePoint[] = [];
 
-    // 4. Считываем TimecodeScale (0x2AD7B1), по умолчанию 1 000 000 нс = 1 мс
-    let timecodeScaleNs = 1_000_000;
-    let durOffset = -1;
-    let durLen = 0;
-    let p = infoDataStart;
+    let scanPos = segmentPayloadStart;
+    while (scanPos < bytes.length - 4) {
+      // Check 4-byte element IDs
+      const b0 = bytes[scanPos];
+      const b1 = bytes[scanPos + 1];
+      const b2 = bytes[scanPos + 2];
+      const b3 = bytes[scanPos + 3];
 
-    while (p < infoDataEnd) {
-      if (p + 3 <= infoDataEnd && u8[p] === 0x2a && u8[p + 1] === 0xd7 && u8[p + 2] === 0xb1) {
-        const tcLen = readVint(u8, p + 3);
-        if (tcLen) {
-          let tcVal = 0;
-          for (let i = 0; i < tcLen.val; i++) {
-            tcVal = (tcVal * 256) + u8[p + 3 + tcLen.len + i];
-          }
-          timecodeScaleNs = tcVal || 1_000_000;
-          p = p + 3 + tcLen.len + tcLen.val;
+      // Segment Info: 0x15 0x49 0xA9 0x66
+      if (b0 === 0x15 && b1 === 0x49 && b2 === 0xa9 && b3 === 0x66) {
+        const v = readVint(bytes, scanPos + 4);
+        if (v) {
+          infoData = bytes.slice(scanPos + 4 + v.length, scanPos + 4 + v.length + v.value);
+          scanPos = scanPos + 4 + v.length + v.value;
           continue;
         }
       }
-      // Duration ID: 0x4489
-      if (p + 2 <= infoDataEnd && u8[p] === 0x44 && u8[p + 1] === 0x89) {
-        const dLen = readVint(u8, p + 2);
-        if (dLen) {
-          durOffset = p;
-          durLen = 2 + dLen.len + dLen.val;
-          break;
+
+      // Tracks: 0x16 0x54 0xAE 0x6B
+      if (b0 === 0x16 && b1 === 0x54 && b2 === 0xae && b3 === 0x6b) {
+        const v = readVint(bytes, scanPos + 4);
+        if (v) {
+          tracksData = bytes.slice(scanPos + 4 + v.length, scanPos + 4 + v.length + v.value);
+          scanPos = scanPos + 4 + v.length + v.value;
+          continue;
         }
       }
-      p++;
-    }
 
-    // Длительность в единицах TimecodeScale
-    const durationInScaleUnits = (targetDurationSec * 1e9) / timecodeScaleNs;
+      // Cluster: 0x1F 0x43 0xB6 0x75
+      if (b0 === 0x1f && b1 === 0x43 && b2 === 0xb6 && b3 === 0x75) {
+        if (firstClusterPos === -1) {
+          firstClusterPos = scanPos;
+        }
+        const v = readVint(bytes, scanPos + 4);
+        const clusterOffset = scanPos - segmentPayloadStart;
 
-    // Вариант А: Тег Duration уже был — обновляем значение на месте
-    if (durOffset !== -1) {
-      const dVint = readVint(u8, durOffset + 2);
-      if (dVint) {
-        const dValOffset = durOffset + 2 + dVint.len;
-        const dValLen = durLen - (dValOffset - durOffset);
-        if (dValLen === 4) {
-          view.setFloat32(dValOffset, durationInScaleUnits, false);
-          return new Blob([u8], { type: rawBlob.type || 'video/webm' });
-        } else if (dValLen === 8) {
-          view.setFloat64(dValOffset, durationInScaleUnits, false);
-          return new Blob([u8], { type: rawBlob.type || 'video/webm' });
+        // Parse cluster Timecode (0xE7) inside cluster
+        if (v) {
+          const clusterDataStart = scanPos + 4 + v.length;
+          if (bytes[clusterDataStart] === 0xe7) {
+            const tcLen = readVint(bytes, clusterDataStart + 1);
+            if (tcLen) {
+              let tcVal = 0;
+              for (let t = 0; t < tcLen.value; t++) {
+                tcVal = tcVal * 256 + bytes[clusterDataStart + 1 + tcLen.length + t];
+              }
+              cues.push({ timecode: tcVal, clusterOffset });
+            }
+          }
+          scanPos = clusterDataStart + v.value;
+          continue;
         }
       }
+
+      scanPos++;
     }
 
-    // Вариант Б: Тег Duration отсутствовал — внедряем 11-байтовый элемент Duration (0x4489)
-    const durElem = new Uint8Array(11);
-    durElem[0] = 0x44;
-    durElem[1] = 0x89;
-    durElem[2] = 0x88; // VINT length = 8 байт
-    const durView = new DataView(durElem.buffer);
-    durView.setFloat64(3, durationInScaleUnits, false); // IEEE 754 Float64 (Big-Endian)
+    if (!tracksData || firstClusterPos === -1) {
+      console.warn('[WebM] Missing tracks or cluster in stream');
+      return blob;
+    }
 
-    const newInfoVal = infoLen.val + 11;
-    const newInfoVint = encodeVint(newInfoVal, infoLen.len);
-    const vintDiff = newInfoVint.length - infoLen.len;
+    // 4. Build refined Info payload
+    // TimecodeScale: 0x2AD7B1 = 1,000,000 ns (1ms)
+    const timecodeScaleElem = encodeElement([0x2a, 0xd7, 0xb1], encodeUint(1000000));
+    // Duration: 0x4489 = Float64(durationMs)
+    const durationElem = encodeElement([0x44, 0x89], encodeFloat64(durationMs));
+    // MuxingApp & WritingApp
+    const muxAppElem = encodeElement([0x4d, 0x80], new TextEncoder().encode('Custom WebM Muxer'));
+    const writeAppElem = encodeElement([0x57, 0x41], new TextEncoder().encode('WebM Duration Fixer'));
+    const newInfoPayload = concatArrays([timecodeScaleElem, durationElem, muxAppElem, writeAppElem]);
+    const newInfoElem = encodeElement([0x15, 0x49, 0xa9, 0x66], newInfoPayload);
 
-    const out = new Uint8Array(u8.length + 11 + vintDiff);
-    out.set(u8.subarray(0, infoLenPos), 0);
-    out.set(newInfoVint, infoLenPos);
-    const newInfoDataStart = infoLenPos + newInfoVint.length;
-    out.set(u8.subarray(infoDataStart, infoDataEnd), newInfoDataStart);
-    out.set(durElem, newInfoDataStart + infoLen.val);
-    out.set(u8.subarray(infoDataEnd), newInfoDataStart + infoLen.val + 11);
+    // 5. Build Tracks Element
+    const newTracksElem = encodeElement([0x16, 0x54, 0xae, 0x6b], tracksData);
 
-    if (!segLen.isUnknown) {
-      const newSegVal = segLen.val + 11 + vintDiff;
-      const newSegVint = encodeVint(newSegVal, segLen.len);
-      if (newSegVint.length === segLen.len) {
-        out.set(newSegVint, segLenPos);
+    // 6. Calculate exact byte offset shift for Cues and SeekHead
+    const oldHeaderLength = firstClusterPos - segmentPayloadStart;
+
+    const makeSeekEntry = (idBytes: number[], offset: number) => {
+      const seekIdElem = encodeElement([0x53, 0xab], new Uint8Array(idBytes));
+      const seekPosElem = encodeElement([0x53, 0xac], encodeUint(offset));
+      return encodeElement([0x4d, 0xbb], concatArrays([seekIdElem, seekPosElem]));
+    };
+
+    const dummySeekHead = encodeElement(
+      [0x11, 0x4d, 0x9b, 0x74],
+      concatArrays([
+        makeSeekEntry([0x15, 0x49, 0xa9, 0x66], 0),
+        makeSeekEntry([0x16, 0x54, 0xae, 0x6b], 0),
+        makeSeekEntry([0x1c, 0x53, 0xbb, 0x6b], 0)
+      ])
+    );
+    const seekHeadLen = dummySeekHead.length;
+    const infoOffset = seekHeadLen;
+    const tracksOffset = infoOffset + newInfoElem.length;
+    const cuesOffset = tracksOffset + newTracksElem.length;
+
+    // Helper to build Cues element given a specific header length delta
+    const buildCuesElem = (delta: number) => {
+      const cuePointsList: Uint8Array[] = [];
+      for (const cue of cues) {
+        const adjustedClusterOffset = Math.max(0, cue.clusterOffset - oldHeaderLength + delta);
+        const cueTimeElem = encodeElement([0xb3], encodeUint(cue.timecode));
+        const cueTrackElem = encodeElement([0xf7], encodeUint(1));
+        const cueClusterPosElem = encodeElement([0xf1], encodeUint(adjustedClusterOffset));
+        const cueTrackPositionsElem = encodeElement([0xb7], concatArrays([cueTrackElem, cueClusterPosElem]));
+        const cuePointElem = encodeElement([0xbb], concatArrays([cueTimeElem, cueTrackPositionsElem]));
+        cuePointsList.push(cuePointElem);
       }
-    }
+      const newCuesPayload = concatArrays(cuePointsList);
+      return encodeElement([0x1c, 0x53, 0xbb, 0x6b], newCuesPayload);
+    };
 
-    return new Blob([out], { type: rawBlob.type || 'video/webm' });
+    // Converge exact new header length across passes
+    let newCuesElem = buildCuesElem(oldHeaderLength);
+    let newHeaderLength = seekHeadLen + newInfoElem.length + newTracksElem.length + newCuesElem.length;
+    newCuesElem = buildCuesElem(newHeaderLength);
+    newHeaderLength = seekHeadLen + newInfoElem.length + newTracksElem.length + newCuesElem.length;
+    newCuesElem = buildCuesElem(newHeaderLength);
+
+    const finalSeekHead = encodeElement(
+      [0x11, 0x4d, 0x9b, 0x74],
+      concatArrays([
+        makeSeekEntry([0x15, 0x49, 0xa9, 0x66], infoOffset),
+        makeSeekEntry([0x16, 0x54, 0xae, 0x6b], tracksOffset),
+        makeSeekEntry([0x1c, 0x53, 0xbb, 0x6b], cuesOffset)
+      ])
+    );
+
+    // 8. Assemble final WebM file
+    // EBML Header slice from original blob
+    const ebmlHeaderBlob = blob.slice(0, segmentPos);
+    // Segment Header with unknown length: 0x18 0x53 0x80 0x67 0xFF
+    const segmentHeaderBuf = new Uint8Array([0x18, 0x53, 0x80, 0x67, 0xff]).buffer as ArrayBuffer;
+    // All original clusters intact from original blob
+    const clustersDataBlob = blob.slice(firstClusterPos);
+
+    const fullBlob = new Blob(
+      [
+        ebmlHeaderBlob,
+        segmentHeaderBuf,
+        finalSeekHead.buffer as ArrayBuffer,
+        newInfoElem.buffer as ArrayBuffer,
+        newTracksElem.buffer as ArrayBuffer,
+        newCuesElem.buffer as ArrayBuffer,
+        clustersDataBlob
+      ],
+      { type: blob.type || 'video/webm' }
+    );
+
+    return fullBlob;
   } catch (err) {
-    console.warn('safeFixWebm error:', err);
-    return rawBlob;
+    console.warn('[WebM] Pure browser duration & index patch error:', err);
+    return blob;
   }
-}
-
-/**
- * Совместимая обёртка для вызова с миллисекундами (durationMs)
- */
-export async function patchWebmDuration(blob: Blob, durationMs: number): Promise<Blob> {
-  return safeFixWebm(blob, durationMs / 1000);
 }
