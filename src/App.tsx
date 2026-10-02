@@ -226,11 +226,17 @@ export default function App() {
     };
   }, []);
 
+  // Robust detection of image vs video files across Android and iOS
+  const isImageFile = (file: File): boolean => {
+    if (file.type && file.type.startsWith('image/')) return true;
+    return /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|svg)$/i.test(file.name);
+  };
+
   // Handle Media File Upload (Video or Image)
   const handleMediaFile = (file: File) => {
     if (!file) return;
 
-    const isImg = file.type.startsWith('image/');
+    const isImg = isImageFile(file);
     setMediaType(isImg ? 'image' : 'video');
 
     const url = URL.createObjectURL(file);
@@ -265,6 +271,11 @@ export default function App() {
     } else {
       setIsImageLoaded(false);
       setIsVideoLoaded(false);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.load();
+        }
+      }, 50);
     }
 
     showToast(`✓ ${file.name}`);
@@ -286,7 +297,6 @@ export default function App() {
       height: v.videoHeight || 1080
     });
     setIsVideoLoaded(true);
-    setupAudioGraph(v);
   };
 
   // Cross-browser Web Audio graph initialization
@@ -623,7 +633,7 @@ export default function App() {
     return () => {
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
     };
-  }, [canvasWidth, canvasHeight, lerpFactor, videoDimensions, mediaType]);
+  }, [canvasWidth, canvasHeight, lerpFactor, videoDimensions, mediaType, videoSrc]);
 
   // Start Recording Stream
   const startRecording = () => {
@@ -632,19 +642,25 @@ export default function App() {
     if (!canvas) return;
 
     try {
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume().catch(() => {});
-      }
-
       const canvasStream = canvas.captureStream(fps);
       const combinedStream = new MediaStream();
 
       canvasStream.getVideoTracks().forEach((track) => combinedStream.addTrack(track));
 
-      if (audioDestNodeRef.current && audioDestNodeRef.current.stream) {
-        audioDestNodeRef.current.stream.getAudioTracks().forEach((track) => {
-          combinedStream.addTrack(track);
-        });
+      // Direct native video audio capture without hijacking playback pipeline
+      const video = videoRef.current;
+      if (video && !video.muted) {
+        try {
+          const vStream = (video as unknown as { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }).captureStream?.()
+            || (video as unknown as { mozCaptureStream?: () => MediaStream }).mozCaptureStream?.();
+          if (vStream) {
+            vStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+              combinedStream.addTrack(track);
+            });
+          }
+        } catch (e) {
+          console.warn('Native video audio capture notice:', e);
+        }
       }
 
       const mimeTypes = [
@@ -1145,13 +1161,19 @@ export default function App() {
                     />
                   ) : (
                     <video
+                      key={videoSrc}
                       ref={videoRef}
                       src={videoSrc}
                       playsInline
                       loop
                       muted={isMuted}
+                      preload="auto"
                       onLoadedMetadata={handleVideoLoadedMetadata}
                       onLoadedData={handleVideoLoadedMetadata}
+                      onCanPlay={() => {
+                        setIsVideoLoaded(true);
+                        setErrorMessage(null);
+                      }}
                       onDurationChange={() => {
                         if (videoRef.current) {
                           const d = videoRef.current.duration;
@@ -1170,8 +1192,8 @@ export default function App() {
                       onEnded={() => setIsPlaying(false)}
                       onError={(e) => {
                         const err = e.currentTarget.error;
-                        // Aborted requests (code 1) happen during pause/seek and are not real playback errors
-                        if (!err || err.code === 1) return;
+                        // Aborted requests (code 1) or already playing video errors should be ignored
+                        if (!err || err.code === 1 || e.currentTarget.videoWidth > 0) return;
                         console.warn('Video format playback error code:', err.code, err.message);
                         setErrorMessage(t.playbackError);
                       }}
