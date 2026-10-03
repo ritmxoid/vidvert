@@ -26,7 +26,9 @@ import {
   ChevronUp,
   Film,
   Globe,
-  RotateCcw
+  RotateCcw,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { PWAInstallButton, OfflineBanner } from './PWAInstallButton';
 import { VidVertLogo, VidVertIcon } from './components/VidVertLogo';
@@ -80,13 +82,14 @@ export interface TranslationStrings {
   modalText: string;
   dontShowAgain: string;
   modalOk: string;
+  confirmReset: string;
 }
 
 export const TRANSLATIONS: Record<Language, TranslationStrings> = {
   ru: {
-    headerSubtitle: '16:9 → 9:16 динамическое кадрирование с LERP-слежением',
+    headerSubtitle: 'Динамическое кадрирование видео и фото с LERP-слежением',
     upload: 'Загрузить',
-    dropPrompt: 'Нажмите или перетащите 16:9 видео сюда',
+    dropPrompt: 'Нажмите или перетащите 16:9 видео/фото сюда',
     ready: 'ГОТОВ',
     pause: 'ПАУЗА',
     safeZone: 'Безопасная зона (Текст/UI не перекрывать)',
@@ -94,7 +97,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: 'Сбросить все настройки по умолчанию (Esc)',
     saveTooltip: 'Сохранить и скачать (Esc)',
     downloadTooltip: 'Скачать клип',
-    toolsToggle: 'Настройки зума, LERP и сетки',
+    toolsToggle: 'Настройки зума, LERP, кадрирования и сетки',
     zoomTitle: 'Зум (Zoom)',
     wheelDir: 'Направление колеса',
     forwardPlus: 'Вперед [ + ]',
@@ -104,7 +107,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: 'По умолчанию',
     lerpFast: 'Быстро',
     lerpSharp: 'Резко',
-    resAndGuides: 'Разрешение и сетки',
+    resAndGuides: 'Разрешение, формат и сетки',
     resLabel: 'Разрешение',
     guidesOn: 'Сетка вкл',
     guidesOff: 'Сетка выкл',
@@ -114,16 +117,17 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Длительность',
     downloadBtn: 'Скачать',
     howToUse: 'Как пользоваться',
-    instructionsText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения. Для доступа к настройкам, прокрутите страницу вверх за край экрана.',
+    instructionsText: 'Загрузите горизонтальное видео или фото (16:9). Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического 9:16, 1:1 или 16:9 ролика. Вы можете нажать на зеленый значок микрофона справа перед стартом, чтобы наложить собственный голос (озвучить видео/слайд-шоу) в процессе записи! Для доступа к настройкам, прокрутите страницу вверх.',
     modalTitle: 'Как пользоваться VidVert',
-    modalText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения. Для доступа к настройкам, прокрутите страницу вверх за край экрана.',
+    modalText: 'Загрузите горизонтальное видео или фото (16:9). Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического 9:16, 1:1 или 16:9 ролика. Вы можете нажать на зеленый значок микрофона справа перед стартом, чтобы наложить собственный голос (озвучить видео/слайд-шоу) в процессе записи! Для доступа к настройкам, прокрутите страницу вверх.',
     dontShowAgain: 'Больше не показывать',
-    modalOk: 'Понятно'
+    modalOk: 'Понятно',
+    confirmReset: 'Вы уверены, что хотите сбросить все настройки кадрирования и зума по умолчанию?'
   },
   en: {
-    headerSubtitle: '16:9 → 9:16 dynamic reframing with LERP tracking',
+    headerSubtitle: 'Dynamic reframing of video and photo with LERP tracking',
     upload: 'Upload',
-    dropPrompt: 'Click or drag & drop 16:9 video here',
+    dropPrompt: 'Click or drag & drop 16:9 video/photo here',
     ready: 'READY',
     pause: 'PAUSE',
     safeZone: 'Safe zone (Keep clear of text/UI)',
@@ -131,7 +135,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: 'Reset all settings to default (Esc)',
     saveTooltip: 'Save and download (Esc)',
     downloadTooltip: 'Download clip',
-    toolsToggle: 'Zoom, LERP & Grid settings',
+    toolsToggle: 'Zoom, LERP, aspect ratio & Grid settings',
     zoomTitle: 'Zoom',
     wheelDir: 'Wheel Direction',
     forwardPlus: 'Forward [ + ]',
@@ -141,7 +145,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: 'Default',
     lerpFast: 'Fast',
     lerpSharp: 'Sharp',
-    resAndGuides: 'Resolution & Guides',
+    resAndGuides: 'Resolution, format & Guides',
     resLabel: 'Resolution',
     guidesOn: 'Grid ON',
     guidesOff: 'Grid OFF',
@@ -151,16 +155,17 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Duration',
     downloadBtn: 'Download',
     howToUse: 'How to Use',
-    instructionsText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue. To access settings, scroll the page up beyond the edge of the screen.',
+    instructionsText: 'Upload a horizontal video or photo (16:9). Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic 9:16, 1:1 or 16:9 clip. You can click the green microphone icon on the right before starting to record your voice over the video or photo/slide-show in real time! To access settings, scroll the page up.',
     modalTitle: 'How to Use VidVert',
-    modalText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue. To access settings, scroll the page up beyond the edge of the screen.',
+    modalText: 'Upload a horizontal video or photo (16:9). Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic 9:16, 1:1 or 16:9 clip. You can click the green microphone icon on the right before starting to record your voice over the video or photo/slide-show in real time! To access settings, scroll the page up.',
     dontShowAgain: 'Don’t show again',
-    modalOk: 'Got it'
+    modalOk: 'Got it',
+    confirmReset: 'Are you sure you want to reset all reframing and zoom settings to defaults?'
   },
   es: {
-    headerSubtitle: '16:9 → 9:16 reencuadre dinámico con seguimiento LERP',
+    headerSubtitle: 'Reencuadre dinámico de video y foto con seguimiento LERP',
     upload: 'Subir',
-    dropPrompt: 'Haga clic o arrastre el video 16:9 aquí',
+    dropPrompt: 'Haga clic o arrastre el video/foto 16:9 aquí',
     ready: 'LISTO',
     pause: 'PAUSA',
     safeZone: 'Zona segura (No tapar con texto/UI)',
@@ -168,7 +173,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: 'Restablecer todos los ajustes (Esc)',
     saveTooltip: 'Guardar y descargar (Esc)',
     downloadTooltip: 'Descargar clip',
-    toolsToggle: 'Ajustes de Zoom, LERP y Cuadrícula',
+    toolsToggle: 'Ajustes de Zoom, LERP, formato y Cuadrícula',
     zoomTitle: 'Zoom',
     wheelDir: 'Dirección de Rueda',
     forwardPlus: 'Adelante [ + ]',
@@ -178,7 +183,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: 'Por defecto',
     lerpFast: 'Rápido',
     lerpSharp: 'Agudo',
-    resAndGuides: 'Resolución y Guías',
+    resAndGuides: 'Resolución, formato y Guías',
     resLabel: 'Resolución',
     guidesOn: 'Cuadrícula ON',
     guidesOff: 'Cuadrícula OFF',
@@ -188,16 +193,17 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Duración',
     downloadBtn: 'Descargar',
     howToUse: 'Cómo usar',
-    instructionsText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar. Para acceder a la configuración, desplace la página hacia arriba más allá del borde de la pantalla.',
+    instructionsText: 'Cargue un video o foto horizontal (16:9). Controle el visor verde, grabe con REC y use el micrófono de la derecha para grabar su voz.',
     modalTitle: 'Cómo usar VidVert',
-    modalText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar. Para acceder a la configuración, desplace la página hacia arriba más allá del borde de la pantalla.',
+    modalText: 'Cargue un video o foto horizontal (16:9). Controle el visor verde, grabe con REC y use el micrófono de la derecha para grabar su voz.',
     dontShowAgain: 'No volver a mostrar',
-    modalOk: 'Entendido'
+    modalOk: 'Entendido',
+    confirmReset: '¿Está seguro de que desea restablecer todos los ajustes?'
   },
   de: {
-    headerSubtitle: '16:9 → 9:16 dynamisches Reframing mit LERP-Tracking',
+    headerSubtitle: 'Dynamisches Reframing von Video und Foto mit LERP-Tracking',
     upload: 'Hochladen',
-    dropPrompt: '16:9-Video hierher ziehen oder klicken',
+    dropPrompt: '16:9-Video/Foto hierher ziehen oder klicken',
     ready: 'BEREIT',
     pause: 'PAUSE',
     safeZone: 'Sicherheitszone (Text/UI freihalten)',
@@ -205,7 +211,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: 'Alle Einstellungen zurücksetzen (Esc)',
     saveTooltip: 'Speichern und herunterladen (Esc)',
     downloadTooltip: 'Clip herunterladen',
-    toolsToggle: 'Zoom, LERP & Raster Einstellungen',
+    toolsToggle: 'Zoom, LERP, Format & Raster Einstellungen',
     zoomTitle: 'Zoom',
     wheelDir: 'Mausrad-Richtung',
     forwardPlus: 'Vorwärts [ + ]',
@@ -215,7 +221,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: 'Standard',
     lerpFast: 'Schnell',
     lerpSharp: 'Scharf',
-    resAndGuides: 'Auflösung & Raster',
+    resAndGuides: 'Auflösung, Format & Raster',
     resLabel: 'Auflösung',
     guidesOn: 'Raster AN',
     guidesOff: 'Raster AUS',
@@ -225,16 +231,17 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Dauer',
     downloadBtn: 'Herunterladen',
     howToUse: 'So verwenden Sie VidVert',
-    instructionsText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren. Um auf die Einstellungen zuzugreifen, scrollen Sie die Seite über den Bildschirmrand nach oben.',
+    instructionsText: 'Laden Sie ein horizontales Video/Foto (16:9) hoch. Steuern Sie den grünen Sucher, nehmen Sie mit REC auf und nutzen Sie das Mikrofon rechts für Sprachaufnahme.',
     modalTitle: 'So verwenden Sie VidVert',
-    modalText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren. Um auf die Einstellungen zuzugreifen, scrollen Sie die Seite über den Bildschirmrand nach oben.',
+    modalText: 'Laden Sie ein horizontales Video/Foto (16:9) hoch. Steuern Sie den grünen Sucher, nehmen Sie mit REC auf und nutzen Sie das Mikrofon rechts für Sprachaufnahme.',
     dontShowAgain: 'Nicht mehr anzeigen',
-    modalOk: 'Verstanden'
+    modalOk: 'Verstanden',
+    confirmReset: 'Sind Sie sicher, dass Sie alle Einstellungen zurücksetzen möchten?'
   },
   fr: {
-    headerSubtitle: '16:9 → 9:16 recadrage dynamique avec suivi LERP',
+    headerSubtitle: 'Recadrage dynamique de vidéo/photo avec suivi LERP',
     upload: 'Importer',
-    dropPrompt: 'Cliquez ou glissez une vidéo 16:9 ici',
+    dropPrompt: 'Cliquez ou glissez une vidéo/photo 16:9 ici',
     ready: 'PRÊT',
     pause: 'PAUSE',
     safeZone: 'Zone sûre (Ne pas superposer texte/UI)',
@@ -242,7 +249,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: 'Réinitialiser tous les paramètres (Esc)',
     saveTooltip: 'Enregistrer et télécharger (Esc)',
     downloadTooltip: 'Télécharger le clip',
-    toolsToggle: 'Paramètres Zoom, LERP et Grille',
+    toolsToggle: 'Paramètres Zoom, LERP, format et Grille',
     zoomTitle: 'Zoom',
     wheelDir: 'Direction de la molette',
     forwardPlus: 'Avant [ + ]',
@@ -252,7 +259,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: 'Par défaut',
     lerpFast: 'Rapide',
     lerpSharp: 'Sec',
-    resAndGuides: 'Résolution et Grille',
+    resAndGuides: 'Résolution, format et Grille',
     resLabel: 'Résolution',
     guidesOn: 'Grille ACTIVÉE',
     guidesOff: 'Grille DÉSACTIVÉE',
@@ -262,16 +269,17 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Durée',
     downloadBtn: 'Télécharger',
     howToUse: 'Comment utiliser',
-    instructionsText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer. Pour accéder aux paramètres, faites défiler la page vers le haut au-delà du bord de l\'écran.',
+    instructionsText: 'Téléchargez une vidéo ou photo (16:9). Contrôlez le viseur, enregistrez avec REC, et utilisez le micro à droite pour enregistrer votre voix.',
     modalTitle: 'Comment utiliser VidVert',
-    modalText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer. Pour accéder aux paramètres, faites défiler la page vers le haut au-delà du bord de l\'écran.',
+    modalText: 'Téléchargez une vidéo ou photo (16:9). Contrôlez le viseur, enregistrez avec REC, et utilisez le micro à droite pour enregistrer votre voix.',
     dontShowAgain: 'Ne plus afficher',
-    modalOk: 'Compris'
+    modalOk: 'Compris',
+    confirmReset: 'Voulez-vous vraiment réinitialiser tous les paramètres?'
   },
   zh: {
-    headerSubtitle: '16:9 → 9:16 动态重构与 LERP 智能追踪',
+    headerSubtitle: '视频与图片动态重构与 LERP 智能追踪',
     upload: '上传',
-    dropPrompt: '点击或拖拽 16:9 视频至此处',
+    dropPrompt: '点击或拖拽 16:9 视频/图片至此处',
     ready: '就绪',
     pause: '暂停',
     safeZone: '安全区域 (避免被字幕/UI遮挡)',
@@ -279,7 +287,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: '重置所有默认设置 (Esc)',
     saveTooltip: '保存并下载 (Esc)',
     downloadTooltip: '下载视频片段',
-    toolsToggle: '缩放、LERP 与网格设置',
+    toolsToggle: '缩放、LERP、画幅与网格设置',
     zoomTitle: '缩放 (Zoom)',
     wheelDir: '滚轮方向',
     forwardPlus: '向前 [ + ]',
@@ -289,7 +297,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: '默认',
     lerpFast: '快速',
     lerpSharp: '敏捷',
-    resAndGuides: '分辨率与网格',
+    resAndGuides: '分辨率、画幅与网格',
     resLabel: '分辨率',
     guidesOn: '网格 开启',
     guidesOff: '网格 关闭',
@@ -299,16 +307,17 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: '时长',
     downloadBtn: '下载',
     howToUse: '如何使用',
-    instructionsText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。如需访问设置，请向上滚动页面超出屏幕边缘。',
+    instructionsText: '上传 16:9 视频/图片，拖动绿色取景框，点击 REC 录制。可在右侧开启麦克风录音。',
     modalTitle: '如何使用 VidVert',
-    modalText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。如需访问设置，请向上滚动页面超出屏幕边缘。',
+    modalText: '上传 16:9 视频/图片，拖动绿色取景框，点击 REC 录制。可在右侧开启麦克风录音。',
     dontShowAgain: '不再显示',
-    modalOk: '知道了'
+    modalOk: '知道了',
+    confirmReset: '您确定要重置所有设置吗？'
   },
   ja: {
-    headerSubtitle: '16:9 → 9:16 LERPトラッキングによる動的リフレーミング',
+    headerSubtitle: '動画・写真の LERPトラッキング動的リフレーミング',
     upload: '読み込み',
-    dropPrompt: '16:9動画をここにドラッグ＆ドロップ',
+    dropPrompt: '16:9動画/写真をここにドラッグ＆ドロップ',
     ready: '準備完了',
     pause: '一時停止',
     safeZone: 'セーフゾーン (テキストやUIで隠さないエリア)',
@@ -316,7 +325,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     resetTooltip: 'すべての設定を初期化 (Esc)',
     saveTooltip: '保存してダウンロード (Esc)',
     downloadTooltip: 'クリップを保存',
-    toolsToggle: 'ズーム・LERP・グリッド設定',
+    toolsToggle: 'ズーム・LERP・比率・グリッド設定',
     zoomTitle: 'ズーム',
     wheelDir: 'ホイール方向',
     forwardPlus: '前進 [ + ]',
@@ -326,7 +335,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     lerpDefault: '標準',
     lerpFast: '高速',
     lerpSharp: '鋭い',
-    resAndGuides: '解像度・グリッド',
+    resAndGuides: '解像度・比率・グリッド',
     resLabel: '解像度',
     guidesOn: 'グリッド ON',
     guidesOff: 'グリッド OFF',
@@ -336,11 +345,12 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: '再生時間',
     downloadBtn: '保存',
     howToUse: '使い方',
-    instructionsText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。設定にアクセスするには、ページを画面の端を超えて上にスクロールしてください。',
+    instructionsText: '16:9の横型動画/写真をアップロードし、緑色のビューファインダーを操作してRECで録画。右側のマイクで自分の声を録音できます。',
     modalTitle: 'VidVertの使い方',
-    modalText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。設定にアクセスするには、ページを画面の端を超えて上にスクロールしてください。',
+    modalText: '16:9の横型動画/写真をアップロードし、緑色のビューファインダーを操作してRECで録画。右側のマイクで自分の声を録音できます。',
     dontShowAgain: '次回から表示しない',
-    modalOk: '了解'
+    modalOk: '了解',
+    confirmReset: 'すべての設定を初期化してもよろしいですか？'
   }
 };
 
@@ -365,6 +375,7 @@ interface RecordedClip {
   duration: number;
   timestamp: string;
   filename: string;
+  aspect?: '9:16' | '1:1' | '16:9';
 }
 
 // Format exported video filename as requested: VidVert_Crop_<original_name>.<ext>
@@ -437,7 +448,12 @@ export default function App() {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoName, setVideoName] = useState<string>('');
   const [isSourceImage, setIsSourceImage] = useState<boolean>(false);
+  const [cropAspect, setCropAspect] = useState<'9:16' | '1:1' | '16:9'>('9:16');
+  const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
+  
   const videoNameRef = useRef<string>('');
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   useEffect(() => {
     videoNameRef.current = videoName;
@@ -479,7 +495,7 @@ export default function App() {
   }, [wheelDirection]);
 
   const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
-  const [fps, setFps] = useState<number>(60);
+  const [fps, setFps] = useState<number>(30);
   const [showGuides, setShowGuides] = useState<boolean>(false);
   const [showSafeZone, setShowSafeZone] = useState<boolean>(false);
 
@@ -535,9 +551,30 @@ export default function App() {
   const [zoomHudVisible, setZoomHudVisible] = useState<boolean>(false);
   const zoomHudTimerRef = useRef<number | null>(null);
 
-  // Canvas dimensions based on target resolution (9:16)
-  const canvasWidth = resolution === '1080p' ? 1080 : 720;
-  const canvasHeight = resolution === '1080p' ? 1920 : 1280;
+  // Canvas dimensions based on target resolution and aspect ratio
+  const getCanvasDimensions = () => {
+    if (cropAspect === '9:16') {
+      return {
+        width: resolution === '1080p' ? 1080 : 720,
+        height: resolution === '1080p' ? 1920 : 1280,
+        aspectClass: 'aspect-[9/16]'
+      };
+    } else if (cropAspect === '1:1') {
+      return {
+        width: resolution === '1080p' ? 1080 : 720,
+        height: resolution === '1080p' ? 1080 : 720,
+        aspectClass: 'aspect-square'
+      };
+    } else {
+      // 16:9
+      return {
+        width: resolution === '1080p' ? 1920 : 1280,
+        height: resolution === '1080p' ? 1080 : 720,
+        aspectClass: 'aspect-video'
+      };
+    }
+  };
+  const { width: canvasWidth, height: canvasHeight, aspectClass: canvasAspectClass } = getCanvasDimensions();
 
   // Show transient toast
   const showToast = (msg: string) => {
@@ -952,17 +989,35 @@ export default function App() {
         : ((videoRef.current && videoRef.current.videoHeight > 0) ? videoRef.current.videoHeight : (videoDimensions.height || 1080));
 
       const baseCropHeight = sh / activeZoom;
-      const baseCropWidth = (baseCropHeight * 9) / 16;
+      let baseCropWidth = (baseCropHeight * 9) / 16;
+      if (cropAspect === '1:1') {
+        baseCropWidth = baseCropHeight;
+      } else if (cropAspect === '16:9') {
+        baseCropWidth = (baseCropHeight * 16) / 9;
+      }
+
       let cropW = baseCropWidth;
       let cropH = baseCropHeight;
 
       if (cropW > sw) {
         cropW = sw;
-        cropH = (cropW * 16) / 9;
+        if (cropAspect === '9:16') {
+          cropH = (cropW * 16) / 9;
+        } else if (cropAspect === '1:1') {
+          cropH = cropW;
+        } else if (cropAspect === '16:9') {
+          cropH = (cropW * 9) / 16;
+        }
       }
       if (cropH > sh) {
         cropH = sh;
-        cropW = (cropH * 9) / 16;
+        if (cropAspect === '9:16') {
+          cropW = (cropH * 9) / 16;
+        } else if (cropAspect === '1:1') {
+          cropW = cropH;
+        } else if (cropAspect === '16:9') {
+          cropW = (cropH * 16) / 9;
+        }
       }
 
       const centerX = currentPosRef.current.x * sw;
@@ -1020,7 +1075,7 @@ export default function App() {
       isRunning = false;
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
     };
-  }, [lerpFactor, resolution, videoDimensions, isSourceImage]);
+  }, [lerpFactor, resolution, videoDimensions, isSourceImage, cropAspect]);
 
   // Start MediaRecorder with combined Canvas Stream + Video Audio
   const startRecording = async () => {
@@ -1030,6 +1085,34 @@ export default function App() {
     }
 
     try {
+      // Get microphone stream if voiceover is enabled
+      if (isMicEnabled) {
+        try {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = micStream;
+
+          if (!audioContextRef.current) {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            audioContextRef.current = new AudioCtx();
+          }
+          const ctx = audioContextRef.current;
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+
+          if (!audioDestNodeRef.current) {
+            audioDestNodeRef.current = ctx.createMediaStreamDestination();
+          }
+
+          const micSource = ctx.createMediaStreamSource(micStream);
+          micSourceNodeRef.current = micSource;
+          micSource.connect(audioDestNodeRef.current);
+        } catch (micErr) {
+          console.warn('Microphone access denied or failed:', micErr);
+          showToast('Микрофон недоступен!');
+        }
+      }
+
       if (!isSourceImage && audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
       }
@@ -1037,7 +1120,7 @@ export default function App() {
       const canvasStream = canvasRef.current.captureStream(fps);
       const audioTracks: MediaStreamTrack[] = [];
 
-      if (!isSourceImage) {
+      if (!isSourceImage || isMicEnabled) {
         if (audioDestNodeRef.current) {
           const destTracks = audioDestNodeRef.current.stream.getAudioTracks();
           if (destTracks.length > 0) {
@@ -1045,7 +1128,7 @@ export default function App() {
           }
         }
 
-        if (audioTracks.length === 0 && videoRef.current) {
+        if (audioTracks.length === 0 && videoRef.current && !isSourceImage) {
           const videoEl = videoRef.current as HTMLVideoElement & {
             captureStream?: () => MediaStream;
             mozCaptureStream?: () => MediaStream;
@@ -1127,7 +1210,8 @@ export default function App() {
           size: `${(finalBlob.size / (1024 * 1024)).toFixed(2)} MB`,
           duration: clipDuration,
           timestamp: new Date().toLocaleTimeString(),
-          filename: exportFilename
+          filename: exportFilename,
+          aspect: cropAspect
         };
 
         setRecordedClips((prev) => [newClip, ...prev]);
@@ -1221,6 +1305,17 @@ export default function App() {
     }
   };
 
+  const stopAndCleanupMic = () => {
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+    if (micSourceNodeRef.current) {
+      micSourceNodeRef.current.disconnect();
+      micSourceNodeRef.current = null;
+    }
+  };
+
   // Stop Recording and Download File
   const stopRecordingAndDownload = () => {
     if (!mediaRecorderRef.current || !isRecording) return;
@@ -1245,6 +1340,7 @@ export default function App() {
       videoRef.current.pause();
     }
     setIsPlaying(false);
+    stopAndCleanupMic();
   };
 
   // Cancel / Reset recording without saving (Keep original video loaded, rewind to start)
@@ -1276,6 +1372,7 @@ export default function App() {
       setCurrentTime(0);
       setIsPlaying(false);
     }
+    stopAndCleanupMic();
 
     showToast('Запись отменена!');
   };
@@ -1285,19 +1382,48 @@ export default function App() {
     if (isRecording) {
       cancelRecording();
     }
+    // Unload media file & clear source
+    if (videoSrc && videoSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(videoSrc);
+    }
+    setVideoSrc(null);
+    setVideoName('');
+    setIsSourceImage(false);
+    setIsVideoLoaded(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+
+    // Reset tracking coordinates and dimensions
     targetPosRef.current = { x: 0.5, y: 0.5 };
     currentPosRef.current = { x: 0.5, y: 0.5 };
     setUiTargetPos({ x: 0.5, y: 0.5 });
+    
+    // Reset zoom and smoothness (LERP)
     targetZoomRef.current = 1.25;
     currentZoomRef.current = 1.25;
     displayZoomRef.current = 1.25;
     setZoom(1.25);
     setDisplayZoom(1.25);
     setLerpFactor(0.1);
+
+    // Reset format & FPS & Resolution
+    setCropAspect('9:16');
+    setResolution('1080p');
+    setFps(30);
+
+    // Reset options
     setWheelDirection('forward-plus');
     setShowGuides(false);
     setShowSafeZone(false);
-    showToast('Сброс всех настроек по умолчанию');
+    setIsMicEnabled(false);
+    stopAndCleanupMic();
+
+    // Clear any recorded clips
+    recordedClips.forEach((clip) => URL.revokeObjectURL(clip.url));
+    setRecordedClips([]);
+
+    showToast('Сброс всех настроек и медиафайла');
   };
 
   // Helper to trigger browser download
@@ -1326,17 +1452,36 @@ export default function App() {
     const sh = videoDimensions.height || 1080;
     const activeZoom = currentZoomRef.current;
     const baseCropH = sh / activeZoom;
-    const baseCropW = (baseCropH * 9) / 16;
+    
+    let baseCropW = (baseCropH * 9) / 16;
+    if (cropAspect === '1:1') {
+      baseCropW = baseCropH;
+    } else if (cropAspect === '16:9') {
+      baseCropW = (baseCropH * 16) / 9;
+    }
+
     let cropW = baseCropW;
     let cropH = baseCropH;
 
     if (cropW > sw) {
       cropW = sw;
-      cropH = (cropW * 16) / 9;
+      if (cropAspect === '9:16') {
+        cropH = (cropW * 16) / 9;
+      } else if (cropAspect === '1:1') {
+        cropH = cropW;
+      } else if (cropAspect === '16:9') {
+        cropH = (cropW * 9) / 16;
+      }
     }
     if (cropH > sh) {
       cropH = sh;
-      cropW = (cropH * 9) / 16;
+      if (cropAspect === '9:16') {
+        cropW = (cropH * 9) / 16;
+      } else if (cropAspect === '1:1') {
+        cropW = cropH;
+      } else if (cropAspect === '16:9') {
+        cropW = (cropH * 16) / 9;
+      }
     }
 
     const currentCenterX = currentPosRef.current.x * sw;
@@ -1356,6 +1501,13 @@ export default function App() {
       height: `${heightPercent}%`
     };
   };
+
+  const previewContainerClass =
+    cropAspect === '9:16'
+      ? 'w-full h-[46vh] xs:h-[50vh] sm:h-[54vh] max-h-[560px] max-w-[280px] xs:max-w-[320px] sm:max-w-[360px]'
+      : cropAspect === '1:1'
+      ? 'w-full max-w-[320px] xs:max-w-[360px] sm:max-w-[420px] aspect-square h-auto'
+      : 'w-full max-w-full lg:max-w-[560px] aspect-video h-auto';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased">
@@ -1411,22 +1563,14 @@ export default function App() {
             )}
           </div>
 
-          <label
-            className={`relative flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 transition active:scale-95 shrink-0 ${
-              isRecording ? 'opacity-40 pointer-events-none' : 'cursor-pointer'
-            } overflow-hidden`}
-          >
-            <Upload className="w-3.5 h-3.5 pointer-events-none" />
-            <span className="pointer-events-none">{t.upload}</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*,image/*"
-              disabled={isRecording}
-              onChange={handleFileUpload}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-            />
-          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/*,image/*"
+            disabled={isRecording}
+            onChange={handleFileUpload}
+            className="hidden"
+          />
         </div>
       </header>
 
@@ -1458,7 +1602,7 @@ export default function App() {
               ref={containerRef}
               onContextMenu={handleCanvasContextMenu}
               style={{ touchAction: 'none', overscrollBehavior: 'none' }}
-              className={`relative aspect-[9/16] w-full h-[46vh] xs:h-[50vh] sm:h-[54vh] max-h-[560px] max-w-[280px] xs:max-w-[320px] sm:max-w-[360px] ${
+              className={`relative ${canvasAspectClass} ${previewContainerClass} ${
                 isRecording ? 'border-rose-500 shadow-rose-950/50' : 'border-slate-800'
               } rounded-xl overflow-hidden bg-black border-2 shadow-2xl flex items-center justify-center group`}
             >
@@ -1470,12 +1614,47 @@ export default function App() {
               />
 
               {/* RIGHT-SIDE ACTION BUTTONS (Icon-only: Reset & Save, positioned on the right above 9:16 badge) */}
-              <div className="absolute right-2 bottom-8 flex flex-col gap-2 z-30">
+              <div className="absolute right-2 bottom-8 flex flex-col items-center gap-3.5 z-30">
+                {/* MICROPHONE VOICE OVER BUTTON */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    resetToDefaults();
+                    if (isRecording) {
+                      showToast('Нельзя переключить микрофон во время записи!');
+                      return;
+                    }
+                    setIsMicEnabled((prev) => {
+                      const next = !prev;
+                      showToast(next ? 'Запись голоса ВКЛ (микрофон активируется при старте)' : 'Запись голоса ВЫКЛ');
+                      return next;
+                    });
+                  }}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 cursor-pointer border ${
+                    isMicEnabled
+                      ? isRecording
+                        ? 'bg-rose-950/80 text-rose-500 border-rose-500 animate-pulse'
+                        : 'bg-amber-500/20 text-amber-400 border-amber-500'
+                      : 'bg-slate-900/80 text-emerald-500 border-emerald-500/40 hover:text-emerald-400'
+                  }`}
+                  title={
+                    isMicEnabled
+                      ? isRecording
+                        ? 'Голос записывается (Микрофон активен!)'
+                        : 'Голос включен (Готов к записи)'
+                      : 'Включить запись голоса (Микрофон выключен)'
+                  }
+                >
+                  <Mic className="w-4 h-4 shrink-0" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(t.confirmReset)) {
+                      resetToDefaults();
+                    }
                   }}
                   className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-amber-500/80 flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 cursor-pointer"
                   title={t.resetTooltip}
@@ -1503,6 +1682,22 @@ export default function App() {
                     <Download className="w-4 h-4" />
                   </button>
                 )}
+
+                {/* DYNAMIC UPLOAD BUTTON IN CANVAS OVERLAY */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={isRecording}
+                  className={`w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-indigo-400 border border-indigo-500/40 hover:border-indigo-500 flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 ${
+                    isRecording ? 'opacity-40 pointer-events-none' : 'cursor-pointer'
+                  }`}
+                  title={t.upload}
+                >
+                  <Upload className="w-4 h-4 text-indigo-400" />
+                </button>
               </div>
 
               {/* Composition Guides */}
@@ -1526,7 +1721,7 @@ export default function App() {
               )}
 
               {/* Safe Zone */}
-              {showSafeZone && (
+              {showSafeZone && cropAspect === '9:16' && (
                 <div className="absolute inset-0 pointer-events-none pt-[10%] pb-[20%] pl-2 pr-[16%] z-10">
                   <div className="w-full h-full border border-dashed border-amber-400/60 rounded flex flex-col justify-start p-1.5 bg-amber-400/5">
                     <span className="text-[8px] font-mono text-amber-400 font-bold tracking-tight">
@@ -1563,7 +1758,7 @@ export default function App() {
               )}
 
               <div className="absolute bottom-1.5 right-1.5 bg-slate-900/80 text-[9px] text-slate-300 px-1.5 py-0.5 rounded font-mono pointer-events-none">
-                9:16
+                {cropAspect}
               </div>
 
               {/* Status Notifications: Displayed at top center of vertical preview */}
@@ -1595,6 +1790,7 @@ export default function App() {
                     <img
                       ref={imageRef}
                       src={videoSrc}
+                      crossOrigin="anonymous"
                       onLoad={handleImageLoaded}
                       alt="Source media"
                       className="w-full h-full object-contain pointer-events-none"
@@ -1603,6 +1799,7 @@ export default function App() {
                     <video
                       ref={videoRef}
                       src={videoSrc}
+                      crossOrigin="anonymous"
                       playsInline
                       loop
                       muted={isMuted}
@@ -1626,6 +1823,7 @@ export default function App() {
                       onEnded={() => setIsPlaying(false)}
                       preload="auto"
                       onError={() => {
+                        if (!videoSrc) return; // Ignore errors triggered when video source is cleared/reset
                         const errCode = videoRef.current?.error?.code;
                         const errMsg = videoRef.current?.error?.message;
                         if (errCode || errMsg) {
@@ -2033,6 +2231,38 @@ export default function App() {
                     {showSafeZone ? t.safeZoneOn : t.safeZoneOff}
                   </button>
                 </div>
+
+                {/* Aspect Ratio Presets row */}
+                <div className="flex flex-col gap-1 pt-1.5 border-t border-slate-800/60 mt-0.5">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Формат / Format:</span>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    {[
+                      { val: '9:16', label: '9:16 vertical' },
+                      { val: '1:1', label: '1:1 square' },
+                      { val: '16:9', label: '16:9 wide' }
+                    ].map((fmt) => (
+                      <button
+                        key={fmt.val}
+                        onClick={() => {
+                          setCropAspect(fmt.val as any);
+                          showToast(`Формат: ${fmt.val}`);
+                        }}
+                        className={`py-1 rounded font-semibold text-center font-mono border transition ${
+                          cropAspect === fmt.val
+                            ? 'bg-indigo-600 text-white border-indigo-400'
+                            : 'bg-slate-800/60 text-slate-400 border-slate-800/80 hover:text-white'
+                        }`}
+                      >
+                        {fmt.val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Brand signature under settings */}
+                <div className="text-center text-[10px] text-indigo-400/80 font-mono font-semibold mt-2.5 pt-2 border-t border-slate-800/60">
+                  VidVert by RitmXoid
+                </div>
               </div>
 
             </div>
@@ -2062,7 +2292,7 @@ export default function App() {
                     <span className="font-mono text-[10px]">{clip.timestamp}</span>
                   </div>
 
-                  <div className="aspect-[9/16] max-h-36 rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                  <div className={`relative ${clip.aspect === '1:1' ? 'aspect-square' : clip.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]'} max-h-48 rounded-lg overflow-hidden bg-black flex items-center justify-center`}>
                     <video
                       src={clip.url}
                       controls
@@ -2102,6 +2332,9 @@ export default function App() {
           <p className="text-[11px] text-slate-400 leading-relaxed">
             {t.instructionsText}
           </p>
+          <div className="text-right text-[10px] text-indigo-400/80 font-mono font-semibold mt-1">
+            VidVert by RitmXoid
+          </div>
         </div>
 
       </main>
@@ -2109,7 +2342,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-2.5 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
         <VidVertIcon size={16} />
-        <span>VidVert • Dynamic 9:16 Video Reframe • 100% Offline & Local</span>
+        <span>VidVert 1.0 — Dynamic Reframe • 100% Offline & Local</span>
       </footer>
 
       <OfflineBanner />
@@ -2124,7 +2357,7 @@ export default function App() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-100">{t.modalTitle}</h3>
-                <p className="text-[11px] text-slate-400">VidVert • Dynamic 9:16 Reframe</p>
+                <p className="text-[11px] text-indigo-400 font-semibold font-mono">VidVert 1.0 — Dynamic Reframe</p>
               </div>
             </div>
 
