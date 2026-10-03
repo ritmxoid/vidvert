@@ -25,7 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
   Film,
-  Globe
+  Globe,
+  RotateCcw
 } from 'lucide-react';
 import { PWAInstallButton, OfflineBanner } from './PWAInstallButton';
 import { VidVertLogo, VidVertIcon } from './components/VidVertLogo';
@@ -51,6 +52,7 @@ export interface TranslationStrings {
   pause: string;
   safeZone: string;
   cancelTooltip: string;
+  resetTooltip: string;
   saveTooltip: string;
   downloadTooltip: string;
   toolsToggle: string;
@@ -89,6 +91,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'ПАУЗА',
     safeZone: 'Безопасная зона (Текст/UI не перекрывать)',
     cancelTooltip: 'Сброс / Отменить запись (Esc)',
+    resetTooltip: 'Сбросить все настройки по умолчанию (Esc)',
     saveTooltip: 'Сохранить и скачать (Esc)',
     downloadTooltip: 'Скачать клип',
     toolsToggle: 'Настройки зума, LERP и сетки',
@@ -111,9 +114,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Длительность',
     downloadBtn: 'Скачать',
     howToUse: 'Как пользоваться',
-    instructionsText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения.',
+    instructionsText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения. Для доступа к настройкам, прокрутите страницу вверх за край экрана.',
     modalTitle: 'Как пользоваться VidVert',
-    modalText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения.',
+    modalText: 'Загрузите горизонтальное 16:9 видео. Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического вертикального 9:16 ролика. Вы можете останавливать запись и перематывать на нужные места для продолжения. Для доступа к настройкам, прокрутите страницу вверх за край экрана.',
     dontShowAgain: 'Больше не показывать',
     modalOk: 'Понятно'
   },
@@ -125,6 +128,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSE',
     safeZone: 'Safe zone (Keep clear of text/UI)',
     cancelTooltip: 'Reset / Cancel recording (Esc)',
+    resetTooltip: 'Reset all settings to default (Esc)',
     saveTooltip: 'Save and download (Esc)',
     downloadTooltip: 'Download clip',
     toolsToggle: 'Zoom, LERP & Grid settings',
@@ -147,9 +151,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Duration',
     downloadBtn: 'Download',
     howToUse: 'How to Use',
-    instructionsText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue.',
+    instructionsText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue. To access settings, scroll the page up beyond the edge of the screen.',
     modalTitle: 'How to Use VidVert',
-    modalText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue.',
+    modalText: 'Upload a horizontal 16:9 video. Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic vertical 9:16 clip. You can pause the recording and rewind to desired points to continue. To access settings, scroll the page up beyond the edge of the screen.',
     dontShowAgain: 'Don’t show again',
     modalOk: 'Got it'
   },
@@ -161,6 +165,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSA',
     safeZone: 'Zona segura (No tapar con texto/UI)',
     cancelTooltip: 'Reiniciar / Cancelar grabación (Esc)',
+    resetTooltip: 'Restablecer todos los ajustes (Esc)',
     saveTooltip: 'Guardar y descargar (Esc)',
     downloadTooltip: 'Descargar clip',
     toolsToggle: 'Ajustes de Zoom, LERP y Cuadrícula',
@@ -183,9 +188,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Duración',
     downloadBtn: 'Descargar',
     howToUse: 'Cómo usar',
-    instructionsText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar.',
+    instructionsText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar. Para acceder a la configuración, desplace la página hacia arriba más allá del borde de la pantalla.',
     modalTitle: 'Cómo usar VidVert',
-    modalText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar.',
+    modalText: 'Cargue un video horizontal 16:9. Controle el visor verde con el ratón o táctil, acerque con la rueda (o pellizco). Pulse REC para grabar un video vertical 9:16 dinámico. Puede pausar la grabación y rebobinar a los puntos deseados para continuar. Para acceder a la configuración, desplace la página hacia arriba más allá del borde de la pantalla.',
     dontShowAgain: 'No volver a mostrar',
     modalOk: 'Entendido'
   },
@@ -197,6 +202,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSE',
     safeZone: 'Sicherheitszone (Text/UI freihalten)',
     cancelTooltip: 'Abbrechen / Zurücksetzen (Esc)',
+    resetTooltip: 'Alle Einstellungen zurücksetzen (Esc)',
     saveTooltip: 'Speichern und herunterladen (Esc)',
     downloadTooltip: 'Clip herunterladen',
     toolsToggle: 'Zoom, LERP & Raster Einstellungen',
@@ -219,9 +225,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Dauer',
     downloadBtn: 'Herunterladen',
     howToUse: 'So verwenden Sie VidVert',
-    instructionsText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren.',
+    instructionsText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren. Um auf die Einstellungen zuzugreifen, scrollen Sie die Seite über den Bildschirmrand nach oben.',
     modalTitle: 'So verwenden Sie VidVert',
-    modalText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren.',
+    modalText: 'Laden Sie ein horizontales 16:9-Video hoch. Steuern Sie den grünen Sucher mit der Maus oder dem Touchscreen, zoomen Sie mit dem Mausrad (oder Zwickgeste). Klicken Sie auf REC, um einen dynamischen vertikalen 9:16-Clip aufzunehmen. Sie können die Aufnahme anhalten und an gewünschte Stellen zurückspulen, um fortzufahren. Um auf die Einstellungen zuzugreifen, scrollen Sie die Seite über den Bildschirmrand nach oben.',
     dontShowAgain: 'Nicht mehr anzeigen',
     modalOk: 'Verstanden'
   },
@@ -233,6 +239,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: 'PAUSE',
     safeZone: 'Zone sûre (Ne pas superposer texte/UI)',
     cancelTooltip: 'Annuler l’enregistrement (Esc)',
+    resetTooltip: 'Réinitialiser tous les paramètres (Esc)',
     saveTooltip: 'Enregistrer et télécharger (Esc)',
     downloadTooltip: 'Télécharger le clip',
     toolsToggle: 'Paramètres Zoom, LERP et Grille',
@@ -255,9 +262,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: 'Durée',
     downloadBtn: 'Télécharger',
     howToUse: 'Comment utiliser',
-    instructionsText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer.',
+    instructionsText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer. Pour accéder aux paramètres, faites défiler la page vers le haut au-delà du bord de l\'écran.',
     modalTitle: 'Comment utiliser VidVert',
-    modalText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer.',
+    modalText: 'Téléchargez une vidéo 16:9 horizontale. Contrôlez le viseur vert à la souris ou au toucher, zoomez avec la molette (ou pincement). Cliquez sur REC pour enregistrer un clip vertical 9:16 dynamique. Vous pouvez mettre l’enregistrement en pause et rembobiner aux endroits souhaités pour continuer. Pour accéder aux paramètres, faites défiler la page vers le haut au-delà du bord de l\'écran.',
     dontShowAgain: 'Ne plus afficher',
     modalOk: 'Compris'
   },
@@ -269,6 +276,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: '暂停',
     safeZone: '安全区域 (避免被字幕/UI遮挡)',
     cancelTooltip: '重置 / 取消录制 (Esc)',
+    resetTooltip: '重置所有默认设置 (Esc)',
     saveTooltip: '保存并下载 (Esc)',
     downloadTooltip: '下载视频片段',
     toolsToggle: '缩放、LERP 与网格设置',
@@ -291,9 +299,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: '时长',
     downloadBtn: '下载',
     howToUse: '如何使用',
-    instructionsText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。',
+    instructionsText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。如需访问设置，请向上滚动页面超出屏幕边缘。',
     modalTitle: '如何使用 VidVert',
-    modalText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。',
+    modalText: '上传 16:9 横屏视频。用鼠标或手指拖动绿色取景框，滚动滚轮（或手指捏合）缩放。点击 REC 录制动态 9:16 竖屏视频。您可以随时暂停录制并倒带至所需位置继续录制。如需访问设置，请向上滚动页面超出屏幕边缘。',
     dontShowAgain: '不再显示',
     modalOk: '知道了'
   },
@@ -305,6 +313,7 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     pause: '一時停止',
     safeZone: 'セーフゾーン (テキストやUIで隠さないエリア)',
     cancelTooltip: 'リセット / 録画キャンセル (Esc)',
+    resetTooltip: 'すべての設定を初期化 (Esc)',
     saveTooltip: '保存してダウンロード (Esc)',
     downloadTooltip: 'クリップを保存',
     toolsToggle: 'ズーム・LERP・グリッド設定',
@@ -327,9 +336,9 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     durationLabel: '再生時間',
     downloadBtn: '保存',
     howToUse: '使い方',
-    instructionsText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。',
+    instructionsText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。設定にアクセスするには、ページを画面の端を超えて上にスクロールしてください。',
     modalTitle: 'VidVertの使い方',
-    modalText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。',
+    modalText: '16:9の横型動画をアップロードします。マウスやタッチで緑色のビューファインダーを操作し、ホイール（またはピンチ）でズームインします。RECを押して動的な9:16縦型動画を録画します。録画を一時停止し、必要な場所に巻き戻して録画を継続できます。設定にアクセスするには、ページを画面の端を超えて上にスクロールしてください。',
     dontShowAgain: '次回から表示しない',
     modalOk: '了解'
   }
@@ -443,11 +452,11 @@ export default function App() {
 
   // Tracking and Framing State
   const [isTrackingActive] = useState<boolean>(true);
-  const [, setZoom] = useState<number>(1.0);
-  const [displayZoom, setDisplayZoom] = useState<number>(1.0);
-  const targetZoomRef = useRef<number>(1.0);
-  const currentZoomRef = useRef<number>(1.0);
-  const displayZoomRef = useRef<number>(1.0);
+  const [, setZoom] = useState<number>(1.25);
+  const [displayZoom, setDisplayZoom] = useState<number>(1.25);
+  const targetZoomRef = useRef<number>(1.25);
+  const currentZoomRef = useRef<number>(1.25);
+  const displayZoomRef = useRef<number>(1.25);
   const lastUiSyncRef = useRef<number>(0);
   const viewfinderBoxRef = useRef<HTMLDivElement | null>(null);
   const [lerpFactor, setLerpFactor] = useState<number>(0.1);
@@ -482,7 +491,8 @@ export default function App() {
 
   // Touch & Pinch State
   const initialPinchDistRef = useRef<number | null>(null);
-  const initialZoomRef = useRef<number>(1.0);
+  const initialZoomRef = useRef<number>(1.25);
+  const lastTouchPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Recording State
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -576,6 +586,14 @@ export default function App() {
       setVideoSrc(url);
       setVideoName(file.name);
       setIsVideoLoaded(false);
+      targetZoomRef.current = 1.25;
+      currentZoomRef.current = 1.25;
+      displayZoomRef.current = 1.25;
+      setZoom(1.25);
+      setDisplayZoom(1.25);
+      targetPosRef.current = { x: 0.5, y: 0.5 };
+      currentPosRef.current = { x: 0.5, y: 0.5 };
+      setUiTargetPos({ x: 0.5, y: 0.5 });
       showToast(`Загружено: ${file.name}`);
     } catch (err) {
       console.error('File load error:', err);
@@ -669,6 +687,7 @@ export default function App() {
   // Update position on pointer move
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>, source: 'source' | 'canvas') => {
     if (!isTrackingActive) return;
+    if (e.pointerType === 'touch') return; // Do NOT process touch pointers in pointerMove (touch handlers do touch dragging)
 
     const targetRect = e.currentTarget.getBoundingClientRect();
     const relX = Math.max(0, Math.min(1, (e.clientX - targetRect.left) / targetRect.width));
@@ -685,12 +704,9 @@ export default function App() {
     }
   };
 
-  // Right-click on 16:9 Source area
+  // Right-click / context menu on 16:9 Source area
   const handleSourceContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    togglePlay();
-    const willBePlaying = videoRef.current?.paused;
-    showToast(willBePlaying ? 'Воспроизведение (ПКМ)' : 'Пауза (ПКМ)');
   };
 
   // Right-click on 9:16 Canvas area
@@ -802,18 +818,13 @@ export default function App() {
     };
   }, []);
 
-  // Mobile Touch Gestures
+  // Mobile Touch Gestures - Relative delta dragging without center snapping
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1 && isTrackingActive) {
       const touch = e.touches[0];
-      const target = sourceContainerRef.current || (e.currentTarget as HTMLElement);
-      const rect = target.getBoundingClientRect();
-      const relX = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-      const relY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
-
-      targetPosRef.current = { x: relX, y: relY };
-      setUiTargetPos({ x: relX, y: relY });
+      lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
     } else if (e.touches.length === 2) {
+      lastTouchPosRef.current = null;
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
@@ -826,30 +837,42 @@ export default function App() {
     if (e.cancelable) {
       e.preventDefault();
     }
-    if (e.touches.length === 2 && initialPinchDistRef.current !== null) {
+    if (e.touches.length === 2 && initialPinchDistRef.current !== null && initialPinchDistRef.current > 0) {
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       const currentDist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      const scaleFactor = currentDist / initialPinchDistRef.current;
-      const newZoom = Math.max(0.8, Math.min(3.0, Number((initialZoomRef.current * scaleFactor).toFixed(2))));
-      handleZoomChange(newZoom, true);
+      if (currentDist > 0) {
+        const scaleFactor = initialPinchDistRef.current / currentDist;
+        const newZoom = Math.max(0.8, Math.min(3.0, Number((initialZoomRef.current * scaleFactor).toFixed(2))));
+        handleZoomChange(newZoom, true);
+      }
       return;
     }
     if (e.touches.length === 1 && isTrackingActive) {
       const touch = e.touches[0];
       const target = sourceContainerRef.current || (e.currentTarget as HTMLElement);
       const rect = target.getBoundingClientRect();
-      const relX = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-      const relY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+      if (rect.width > 0 && rect.height > 0) {
+        if (lastTouchPosRef.current) {
+          const dx = (touch.clientX - lastTouchPosRef.current.x) / rect.width;
+          const dy = (touch.clientY - lastTouchPosRef.current.y) / rect.height;
+          const newX = Math.max(0, Math.min(1, targetPosRef.current.x + dx));
+          const newY = Math.max(0, Math.min(1, targetPosRef.current.y + dy));
 
-      targetPosRef.current = { x: relX, y: relY };
-      setUiTargetPos({ x: relX, y: relY });
+          targetPosRef.current = { x: newX, y: newY };
+          setUiTargetPos({ x: newX, y: newY });
+        }
+        lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
+      }
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (e.touches.length < 2) {
       initialPinchDistRef.current = null;
+    }
+    if (e.touches.length === 0) {
+      lastTouchPosRef.current = null;
     }
   };
 
@@ -1205,6 +1228,26 @@ export default function App() {
     showToast('Запись отменена!');
   };
 
+  // Reset all settings, viewfinder position, zoom, and LERP to default values
+  const resetToDefaults = () => {
+    if (isRecording) {
+      cancelRecording();
+    }
+    targetPosRef.current = { x: 0.5, y: 0.5 };
+    currentPosRef.current = { x: 0.5, y: 0.5 };
+    setUiTargetPos({ x: 0.5, y: 0.5 });
+    targetZoomRef.current = 1.25;
+    currentZoomRef.current = 1.25;
+    displayZoomRef.current = 1.25;
+    setZoom(1.25);
+    setDisplayZoom(1.25);
+    setLerpFactor(0.1);
+    setWheelDirection('forward-plus');
+    setShowGuides(false);
+    setShowSafeZone(false);
+    showToast('Сброс всех настроек по умолчанию');
+  };
+
   // Helper to trigger browser download
   const downloadBlob = (blob: Blob, filename: string) => {
     const a = document.createElement('a');
@@ -1376,19 +1419,18 @@ export default function App() {
 
               {/* RIGHT-SIDE ACTION BUTTONS (Icon-only: Reset & Save, positioned on the right above 9:16 badge) */}
               <div className="absolute right-2 bottom-8 flex flex-col gap-2 z-30">
-                {isRecording && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      cancelRecording();
-                    }}
-                    className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-rose-400 border border-orange-500/80 flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 cursor-pointer"
-                    title={t.cancelTooltip}
-                  >
-                    <Square className="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resetToDefaults();
+                  }}
+                  className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-amber-500/80 flex items-center justify-center shadow-lg backdrop-blur-sm transition active:scale-95 cursor-pointer"
+                  title={t.resetTooltip}
+                >
+                  <RotateCcw className="w-4 h-4 text-amber-400" />
+                </button>
+
                 {(isRecording || recordedClips.length > 0) && (
                   <button
                     type="button"
@@ -1581,7 +1623,7 @@ export default function App() {
                     <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-white" />
                     <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-white" />
 
-                    {/* CENTER TARGET BUTTON */}
+                    {/* CLASSIC RED RECORD / PAUSE CENTRAL BUTTON */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1602,13 +1644,10 @@ export default function App() {
                           togglePauseRecording();
                         }
                       }}
-                      className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto min-w-[48px] min-h-[48px] p-3 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xl border-2 border-white/50 z-20 cursor-pointer ${
-                        !isRecording
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/40'
-                          : isRecordingPaused
-                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-500/40'
-                          : 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse shadow-rose-500/50'
-                      }`}
+                      style={{
+                        transform: `translate(-50%, -50%) scale(${Math.max(0.6, Math.min(1.0, 1 / Math.sqrt(displayZoom)))})`
+                      }}
+                      className="absolute top-1/2 left-1/2 pointer-events-auto w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-950/80 border-2 border-emerald-400/90 shadow-2xl backdrop-blur-sm flex items-center justify-center transition-transform hover:scale-110 active:scale-90 z-20 cursor-pointer group"
                       title={
                         !isRecording
                           ? 'Старт записи (Клик / Пробел)'
@@ -1617,36 +1656,26 @@ export default function App() {
                           : 'Пауза записи (Клик / P)'
                       }
                     >
-                      <Crosshair className="w-6 h-6 stroke-[2.5]" />
+                      {!isRecording ? (
+                        /* Red Record Dot */
+                        <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-rose-600 hover:bg-rose-500 shadow-[0_0_12px_rgba(225,29,72,0.9)] group-hover:scale-105 transition" />
+                      ) : isRecordingPaused ? (
+                        /* Amber Pause Dot */
+                        <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.9)] transition" />
+                      ) : (
+                        /* Active Pulsing Red Square */
+                        <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm bg-rose-600 shadow-[0_0_14px_rgba(225,29,72,1)] animate-pulse transition" />
+                      )}
                     </button>
 
                     {/* Viewfinder Status Badge */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isRecording) {
-                          startRecording();
-                        } else {
-                          togglePauseRecording();
-                        }
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        if (!isRecording) {
-                          startRecording();
-                        } else {
-                          togglePauseRecording();
-                        }
-                      }}
-                      className={`absolute top-1 left-1 text-[9px] font-mono px-2 py-1 rounded font-bold shadow text-white flex items-center gap-1 pointer-events-auto cursor-pointer transition active:scale-95 z-20 ${
+                    <div
+                      className={`absolute top-1 left-1 text-[8px] sm:text-[9px] font-mono px-1.5 py-0.5 rounded font-bold shadow text-white flex items-center gap-1 pointer-events-none select-none z-20 ${
                         !isRecording
-                          ? 'bg-emerald-600 hover:bg-emerald-500'
+                          ? 'bg-emerald-600/90'
                           : isRecordingPaused
-                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                          : 'bg-rose-600 hover:bg-rose-500'
+                          ? 'bg-amber-500/90 text-slate-950'
+                          : 'bg-rose-600/90'
                       }`}
                     >
                       {!isRecording ? (
@@ -1665,7 +1694,7 @@ export default function App() {
                           <span>REC {formatTime(recordingTime)}</span>
                         </>
                       )}
-                    </button>
+                    </div>
                   </div>
                 </>
               ) : (

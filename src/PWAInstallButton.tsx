@@ -110,12 +110,24 @@ export const PWAInstallButton: React.FC = () => {
 
 export const OfflineBanner: React.FC = () => {
   const isOnline = useOnlineStatus();
-  if (isOnline) return null;
+  const [visible, setVisible] = useState(true);
+
+  React.useEffect(() => {
+    // Hide after 1 second (1000ms)
+    const timer = setTimeout(() => {
+      setVisible(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isOnline || !visible) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-500/90 border border-amber-400 text-slate-950 px-3.5 py-2 text-xs font-semibold shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom duration-200">
-      <WifiOff className="w-4 h-4 text-slate-950" />
-      <span>Офлайн режим (PWA активно)</span>
+    <div className="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center animate-in fade-in zoom-in duration-300">
+      <div className="flex items-center gap-2.5 rounded-2xl bg-slate-950/70 border border-slate-800/40 text-slate-200 px-5 py-3 text-xs sm:text-sm font-medium shadow-2xl backdrop-blur-md max-w-[90%] select-none">
+        <WifiOff className="w-4 h-4 text-amber-400 shrink-0" />
+        <span>Оффлайн режим активен!</span>
+      </div>
     </div>
   );
 };

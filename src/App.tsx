@@ -428,13 +428,15 @@ export default function App() {
 
   // Video and Canvas references
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sourceContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Video State
+  // Video and Image State
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoName, setVideoName] = useState<string>('');
+  const [isSourceImage, setIsSourceImage] = useState<boolean>(false);
   const videoNameRef = useRef<string>('');
 
   useEffect(() => {
@@ -452,11 +454,11 @@ export default function App() {
 
   // Tracking and Framing State
   const [isTrackingActive] = useState<boolean>(true);
-  const [, setZoom] = useState<number>(1.0);
-  const [displayZoom, setDisplayZoom] = useState<number>(1.0);
-  const targetZoomRef = useRef<number>(1.0);
-  const currentZoomRef = useRef<number>(1.0);
-  const displayZoomRef = useRef<number>(1.0);
+  const [, setZoom] = useState<number>(1.25);
+  const [displayZoom, setDisplayZoom] = useState<number>(1.25);
+  const targetZoomRef = useRef<number>(1.25);
+  const currentZoomRef = useRef<number>(1.25);
+  const displayZoomRef = useRef<number>(1.25);
   const lastUiSyncRef = useRef<number>(0);
   const viewfinderBoxRef = useRef<HTMLDivElement | null>(null);
   const [lerpFactor, setLerpFactor] = useState<number>(0.1);
@@ -491,7 +493,8 @@ export default function App() {
 
   // Touch & Pinch State
   const initialPinchDistRef = useRef<number | null>(null);
-  const initialZoomRef = useRef<number>(1.0);
+  const initialZoomRef = useRef<number>(1.25);
+  const lastTouchPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Recording State
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -512,6 +515,21 @@ export default function App() {
   const audioDestNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
   const isScrubbingRef = useRef<boolean>(false);
+
+  // Global pointerup/touchend listener to prevent scrubber from getting stuck on mobile/desktop
+  useEffect(() => {
+    const handleGlobalRelease = () => {
+      isScrubbingRef.current = false;
+    };
+    window.addEventListener('pointerup', handleGlobalRelease);
+    window.addEventListener('touchend', handleGlobalRelease);
+    window.addEventListener('mouseup', handleGlobalRelease);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalRelease);
+      window.removeEventListener('touchend', handleGlobalRelease);
+      window.removeEventListener('mouseup', handleGlobalRelease);
+    };
+  }, []);
 
   // Zoom HUD temporary indicator
   const [zoomHudVisible, setZoomHudVisible] = useState<boolean>(false);
@@ -571,7 +589,7 @@ export default function App() {
     };
   }, []);
 
-  // Handle Video File Upload with full Android/iOS & Desktop format support
+  // Handle Video / Image File Upload with full format support
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -581,18 +599,42 @@ export default function App() {
       if (videoSrc && videoSrc.startsWith('blob:')) {
         URL.revokeObjectURL(videoSrc);
       }
+      const isImg = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|svg|bmp|avif)$/i.test(file.name);
+      setIsSourceImage(isImg);
+
       const url = URL.createObjectURL(file);
       setVideoSrc(url);
       setVideoName(file.name);
       setIsVideoLoaded(false);
+      targetZoomRef.current = 1.25;
+      currentZoomRef.current = 1.25;
+      displayZoomRef.current = 1.25;
+      setZoom(1.25);
+      setDisplayZoom(1.25);
+      targetPosRef.current = { x: 0.5, y: 0.5 };
+      currentPosRef.current = { x: 0.5, y: 0.5 };
+      setUiTargetPos({ x: 0.5, y: 0.5 });
       showToast(`Загружено: ${file.name}`);
     } catch (err) {
       console.error('File load error:', err);
-      setErrorMessage('Не удалось загрузить видеофайл.');
+      setErrorMessage('Не удалось загрузить медиафайл.');
     } finally {
       // Clear input so selecting the same file again works
       e.target.value = '';
     }
+  };
+
+  // Image metadata loaded
+  const handleImageLoaded = () => {
+    if (!imageRef.current) return;
+    const img = imageRef.current;
+    setDuration(0);
+    setCurrentTime(0);
+    setVideoDimensions({
+      width: img.naturalWidth || 1920,
+      height: img.naturalHeight || 1080
+    });
+    setIsVideoLoaded(true);
   };
 
   // Video metadata loaded
@@ -643,14 +685,18 @@ export default function App() {
 
   // Seek video to specific timestamp
   const seekVideo = (time: number) => {
-    if (!videoRef.current) return;
+    if (isSourceImage || !videoRef.current) return;
     const clamped = Math.max(0, Math.min(duration || 0, time));
     setCurrentTime(clamped);
     videoRef.current.currentTime = clamped;
   };
 
-  // Toggle Video Playback
+  // Toggle Video / Image Playback
   const togglePlay = () => {
+    if (isSourceImage) {
+      setIsPlaying((prev) => !prev);
+      return;
+    }
     if (!videoRef.current) return;
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().catch(() => {});
@@ -678,6 +724,7 @@ export default function App() {
   // Update position on pointer move
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>, source: 'source' | 'canvas') => {
     if (!isTrackingActive) return;
+    if (e.pointerType === 'touch') return; // Do NOT process touch pointers in pointerMove (touch handlers do touch dragging)
 
     const targetRect = e.currentTarget.getBoundingClientRect();
     const relX = Math.max(0, Math.min(1, (e.clientX - targetRect.left) / targetRect.width));
@@ -694,12 +741,9 @@ export default function App() {
     }
   };
 
-  // Right-click on 16:9 Source area
+  // Right-click / context menu on 16:9 Source area
   const handleSourceContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    togglePlay();
-    const willBePlaying = videoRef.current?.paused;
-    showToast(willBePlaying ? 'Воспроизведение (ПКМ)' : 'Пауза (ПКМ)');
   };
 
   // Right-click on 9:16 Canvas area
@@ -811,18 +855,13 @@ export default function App() {
     };
   }, []);
 
-  // Mobile Touch Gestures
+  // Mobile Touch Gestures - Relative delta dragging without center snapping
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1 && isTrackingActive) {
       const touch = e.touches[0];
-      const target = sourceContainerRef.current || (e.currentTarget as HTMLElement);
-      const rect = target.getBoundingClientRect();
-      const relX = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-      const relY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
-
-      targetPosRef.current = { x: relX, y: relY };
-      setUiTargetPos({ x: relX, y: relY });
+      lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
     } else if (e.touches.length === 2) {
+      lastTouchPosRef.current = null;
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
@@ -835,30 +874,42 @@ export default function App() {
     if (e.cancelable) {
       e.preventDefault();
     }
-    if (e.touches.length === 2 && initialPinchDistRef.current !== null) {
+    if (e.touches.length === 2 && initialPinchDistRef.current !== null && initialPinchDistRef.current > 0) {
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       const currentDist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      const scaleFactor = currentDist / initialPinchDistRef.current;
-      const newZoom = Math.max(0.8, Math.min(3.0, Number((initialZoomRef.current * scaleFactor).toFixed(2))));
-      handleZoomChange(newZoom, true);
+      if (currentDist > 0) {
+        const scaleFactor = initialPinchDistRef.current / currentDist;
+        const newZoom = Math.max(0.8, Math.min(3.0, Number((initialZoomRef.current * scaleFactor).toFixed(2))));
+        handleZoomChange(newZoom, true);
+      }
       return;
     }
     if (e.touches.length === 1 && isTrackingActive) {
       const touch = e.touches[0];
       const target = sourceContainerRef.current || (e.currentTarget as HTMLElement);
       const rect = target.getBoundingClientRect();
-      const relX = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-      const relY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+      if (rect.width > 0 && rect.height > 0) {
+        if (lastTouchPosRef.current) {
+          const dx = (touch.clientX - lastTouchPosRef.current.x) / rect.width;
+          const dy = (touch.clientY - lastTouchPosRef.current.y) / rect.height;
+          const newX = Math.max(0, Math.min(1, targetPosRef.current.x + dx));
+          const newY = Math.max(0, Math.min(1, targetPosRef.current.y + dy));
 
-      targetPosRef.current = { x: relX, y: relY };
-      setUiTargetPos({ x: relX, y: relY });
+          targetPosRef.current = { x: newX, y: newY };
+          setUiTargetPos({ x: newX, y: newY });
+        }
+        lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
+      }
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (e.touches.length < 2) {
       initialPinchDistRef.current = null;
+    }
+    if (e.touches.length === 0) {
+      lastTouchPosRef.current = null;
     }
   };
 
@@ -888,8 +939,17 @@ export default function App() {
       }
       const activeZoom = currentZoomRef.current;
 
-      const sw = (video && video.videoWidth > 0) ? video.videoWidth : (videoDimensions.width || 1920);
-      const sh = (video && video.videoHeight > 0) ? video.videoHeight : (videoDimensions.height || 1080);
+      const mediaEl = isSourceImage ? imageRef.current : videoRef.current;
+      const isMediaReady = isSourceImage
+        ? Boolean(imageRef.current && imageRef.current.complete && imageRef.current.naturalWidth > 0)
+        : Boolean(videoRef.current && (videoRef.current.readyState >= 1 || videoRef.current.videoWidth > 0));
+
+      const sw = isSourceImage
+        ? (imageRef.current?.naturalWidth || videoDimensions.width || 1920)
+        : ((videoRef.current && videoRef.current.videoWidth > 0) ? videoRef.current.videoWidth : (videoDimensions.width || 1920));
+      const sh = isSourceImage
+        ? (imageRef.current?.naturalHeight || videoDimensions.height || 1080)
+        : ((videoRef.current && videoRef.current.videoHeight > 0) ? videoRef.current.videoHeight : (videoDimensions.height || 1080));
 
       const baseCropHeight = sh / activeZoom;
       const baseCropWidth = (baseCropHeight * 9) / 16;
@@ -923,12 +983,12 @@ export default function App() {
         viewfinderBoxRef.current.style.height = `${heightPercent}%`;
       }
 
-      // Draw video frame to canvas
-      if (video && (video.readyState >= 1 || video.videoWidth > 0)) {
+      // Draw media frame to canvas
+      if (isMediaReady && mediaEl) {
         try {
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+          ctx.drawImage(mediaEl, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
         } catch {
           // Keep loop alive if transient frame decode glitch
         }
@@ -938,7 +998,7 @@ export default function App() {
         ctx.fillStyle = '#64748b';
         ctx.font = '22px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Перетащите видео (16:9)', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Перетащите видео или фото (16:9)', canvas.width / 2, canvas.height / 2);
       }
 
       const now = performance.now();
@@ -960,40 +1020,42 @@ export default function App() {
       isRunning = false;
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
     };
-  }, [lerpFactor, resolution, videoDimensions]);
+  }, [lerpFactor, resolution, videoDimensions, isSourceImage]);
 
   // Start MediaRecorder with combined Canvas Stream + Video Audio
   const startRecording = async () => {
-    if (!canvasRef.current || !videoRef.current) {
-      setErrorMessage('Канвас или видео не инициализированы');
+    if (!canvasRef.current || (!videoRef.current && !isSourceImage)) {
+      setErrorMessage('Канвас или медиафайл не инициализированы');
       return;
     }
 
     try {
-      if (audioContextRef.current?.state === 'suspended') {
+      if (!isSourceImage && audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
       }
 
       const canvasStream = canvasRef.current.captureStream(fps);
       const audioTracks: MediaStreamTrack[] = [];
 
-      if (audioDestNodeRef.current) {
-        const destTracks = audioDestNodeRef.current.stream.getAudioTracks();
-        if (destTracks.length > 0) {
-          audioTracks.push(destTracks[0]);
+      if (!isSourceImage) {
+        if (audioDestNodeRef.current) {
+          const destTracks = audioDestNodeRef.current.stream.getAudioTracks();
+          if (destTracks.length > 0) {
+            audioTracks.push(destTracks[0]);
+          }
         }
-      }
 
-      if (audioTracks.length === 0) {
-        const videoEl = videoRef.current as HTMLVideoElement & {
-          captureStream?: () => MediaStream;
-          mozCaptureStream?: () => MediaStream;
-        };
-        const vidStream = videoEl.captureStream ? videoEl.captureStream() : videoEl.mozCaptureStream ? videoEl.mozCaptureStream() : null;
-        if (vidStream) {
-          const vAudioTracks = vidStream.getAudioTracks();
-          if (vAudioTracks.length > 0) {
-            audioTracks.push(vAudioTracks[0]);
+        if (audioTracks.length === 0 && videoRef.current) {
+          const videoEl = videoRef.current as HTMLVideoElement & {
+            captureStream?: () => MediaStream;
+            mozCaptureStream?: () => MediaStream;
+          };
+          const vidStream = videoEl.captureStream ? videoEl.captureStream() : videoEl.mozCaptureStream ? videoEl.mozCaptureStream() : null;
+          if (vidStream) {
+            const vAudioTracks = vidStream.getAudioTracks();
+            if (vAudioTracks.length > 0) {
+              audioTracks.push(vAudioTracks[0]);
+            }
           }
         }
       }
@@ -1088,8 +1150,10 @@ export default function App() {
         setRecordingTime((t) => t + 1);
       }, 1000);
 
-      if (videoRef.current.paused) {
+      if (!isSourceImage && videoRef.current && videoRef.current.paused) {
         videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      } else if (isSourceImage) {
+        setIsPlaying(true);
       }
 
       showToast('Запись 9:16 видео начата!');
@@ -1117,14 +1181,14 @@ export default function App() {
         recordingTimerRef.current = null;
       }
       setIsRecordingPaused(true);
-      if (videoRef.current && !videoRef.current.paused) {
+      if (!isSourceImage && videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause();
-        setIsPlaying(false);
       }
+      setIsPlaying(false);
       showToast('Запись приостановлена');
     } else {
       // RESUME
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      if (!isSourceImage && audioContextRef.current && audioContextRef.current.state === 'suspended') {
         audioContextRef.current.resume().catch(() => {});
       }
       if (mediaRecorderRef.current.state === 'paused') {
@@ -1138,7 +1202,7 @@ export default function App() {
         setRecordingTime((t) => t + 1);
       }, 1000);
 
-      if (videoRef.current) {
+      if (!isSourceImage && videoRef.current) {
         const playPromise = videoRef.current.play();
         if (playPromise !== undefined) {
           playPromise
@@ -1150,6 +1214,8 @@ export default function App() {
               }
             });
         }
+      } else if (isSourceImage) {
+        setIsPlaying(true);
       }
       showToast('Запись возобновлена');
     }
@@ -1175,10 +1241,10 @@ export default function App() {
     setIsRecording(false);
     setIsRecordingPaused(false);
 
-    if (videoRef.current && !videoRef.current.paused) {
+    if (!isSourceImage && videoRef.current && !videoRef.current.paused) {
       videoRef.current.pause();
-      setIsPlaying(false);
     }
+    setIsPlaying(false);
   };
 
   // Cancel / Reset recording without saving (Keep original video loaded, rewind to start)
@@ -1222,11 +1288,11 @@ export default function App() {
     targetPosRef.current = { x: 0.5, y: 0.5 };
     currentPosRef.current = { x: 0.5, y: 0.5 };
     setUiTargetPos({ x: 0.5, y: 0.5 });
-    targetZoomRef.current = 1.0;
-    currentZoomRef.current = 1.0;
-    displayZoomRef.current = 1.0;
-    setZoom(1.0);
-    setDisplayZoom(1.0);
+    targetZoomRef.current = 1.25;
+    currentZoomRef.current = 1.25;
+    displayZoomRef.current = 1.25;
+    setZoom(1.25);
+    setDisplayZoom(1.25);
     setLerpFactor(0.1);
     setWheelDirection('forward-plus');
     setShowGuides(false);
@@ -1355,7 +1421,7 @@ export default function App() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/*"
+              accept="video/*,image/*"
               disabled={isRecording}
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
@@ -1525,49 +1591,59 @@ export default function App() {
             >
               {videoSrc ? (
                 <>
-                  <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    playsInline
-                    loop
-                    muted={isMuted}
-                    onLoadedMetadata={handleVideoLoadedMetadata}
-                    onLoadedData={handleVideoLoadedMetadata}
-                    onDurationChange={() => {
-                      if (videoRef.current) {
-                        const d = videoRef.current.duration;
-                        if (Number.isFinite(d) && d > 0) {
-                          setDuration(d);
+                  {isSourceImage ? (
+                    <img
+                      ref={imageRef}
+                      src={videoSrc}
+                      onLoad={handleImageLoaded}
+                      alt="Source media"
+                      className="w-full h-full object-contain pointer-events-none"
+                    />
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      playsInline
+                      loop
+                      muted={isMuted}
+                      onLoadedMetadata={handleVideoLoadedMetadata}
+                      onLoadedData={handleVideoLoadedMetadata}
+                      onDurationChange={() => {
+                        if (videoRef.current) {
+                          const d = videoRef.current.duration;
+                          if (Number.isFinite(d) && d > 0) {
+                            setDuration(d);
+                          }
                         }
-                      }
-                    }}
-                    onTimeUpdate={() => {
-                      if (videoRef.current && !isScrubbingRef.current) {
-                        setCurrentTime(videoRef.current.currentTime);
-                      }
-                    }}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onEnded={() => setIsPlaying(false)}
-                    preload="auto"
-                    onError={() => {
-                      const errCode = videoRef.current?.error?.code;
-                      const errMsg = videoRef.current?.error?.message;
-                      if (errCode || errMsg) {
-                        console.error('Video playback error:', errCode, errMsg);
-                      }
-                      if (errCode === 4) {
-                        setErrorMessage('Кодек видео не поддерживается браузером (обычно это HEVC/H.265 или 10-bit HDR с камеры телефона). Браузер поддерживает стандартные MP4 (H.264) и WebM.');
-                      } else if (errCode === 3) {
-                        setErrorMessage('Ошибка декодирования видео (слишком высокое разрешение или повреждён файл).');
-                      } else if (errCode === 1) {
-                        return; // Aborted by browser/user, do not treat as error
-                      } else {
-                        setErrorMessage('Не удалось воспроизвести видеофайл. Пожалуйста, используйте MP4 (H.264).');
-                      }
-                    }}
-                    className="w-full h-full object-contain pointer-events-none"
-                  />
+                      }}
+                      onTimeUpdate={() => {
+                        if (videoRef.current && !isScrubbingRef.current) {
+                          setCurrentTime(videoRef.current.currentTime);
+                        }
+                      }}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onEnded={() => setIsPlaying(false)}
+                      preload="auto"
+                      onError={() => {
+                        const errCode = videoRef.current?.error?.code;
+                        const errMsg = videoRef.current?.error?.message;
+                        if (errCode || errMsg) {
+                          console.error('Video playback error:', errCode, errMsg);
+                        }
+                        if (errCode === 4) {
+                          setErrorMessage('Кодек видео не поддерживается браузером (обычно это HEVC/H.265 или 10-bit HDR с камеры телефона). Браузер поддерживает стандартные MP4 (H.264) и WebM.');
+                        } else if (errCode === 3) {
+                          setErrorMessage('Ошибка декодирования видео (слишком высокое разрешение или повреждён файл).');
+                        } else if (errCode === 1) {
+                          return; // Aborted by browser/user, do not treat as error
+                        } else {
+                          setErrorMessage('Не удалось воспроизвести видеофайл. Пожалуйста, используйте MP4 (H.264).');
+                        }
+                      }}
+                      className="w-full h-full object-contain pointer-events-none"
+                    />
+                  )}
 
                   {/* Target Cursor Indicator */}
                   {isTrackingActive && (
@@ -1609,7 +1685,7 @@ export default function App() {
                     <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-white" />
                     <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-white" />
 
-                    {/* CENTER TARGET BUTTON */}
+                    {/* CLASSIC RED RECORD / PAUSE CENTRAL BUTTON */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1630,13 +1706,10 @@ export default function App() {
                           togglePauseRecording();
                         }
                       }}
-                      className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto min-w-[48px] min-h-[48px] p-3 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xl border-2 border-white/50 z-20 cursor-pointer ${
-                        !isRecording
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/40'
-                          : isRecordingPaused
-                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-500/40'
-                          : 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse shadow-rose-500/50'
-                      }`}
+                      style={{
+                        transform: `translate(-50%, -50%) scale(${Math.max(0.6, Math.min(1.0, 1 / Math.sqrt(displayZoom)))})`
+                      }}
+                      className="absolute top-1/2 left-1/2 pointer-events-auto w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-950/80 border-2 border-emerald-400/90 shadow-2xl backdrop-blur-sm flex items-center justify-center transition-transform hover:scale-110 active:scale-90 z-20 cursor-pointer group"
                       title={
                         !isRecording
                           ? 'Старт записи (Клик / Пробел)'
@@ -1645,36 +1718,26 @@ export default function App() {
                           : 'Пауза записи (Клик / P)'
                       }
                     >
-                      <Crosshair className="w-6 h-6 stroke-[2.5]" />
+                      {!isRecording ? (
+                        /* Red Record Dot */
+                        <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-rose-600 hover:bg-rose-500 shadow-[0_0_12px_rgba(225,29,72,0.9)] group-hover:scale-105 transition" />
+                      ) : isRecordingPaused ? (
+                        /* Yellow Pause Icon */
+                        <Pause className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 fill-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.9)] transition" />
+                      ) : (
+                        /* Active Pulsing Red Square */
+                        <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm bg-rose-600 shadow-[0_0_14px_rgba(225,29,72,1)] animate-pulse transition" />
+                      )}
                     </button>
 
                     {/* Viewfinder Status Badge */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isRecording) {
-                          startRecording();
-                        } else {
-                          togglePauseRecording();
-                        }
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        if (!isRecording) {
-                          startRecording();
-                        } else {
-                          togglePauseRecording();
-                        }
-                      }}
-                      className={`absolute top-1 left-1 text-[9px] font-mono px-2 py-1 rounded font-bold shadow text-white flex items-center gap-1 pointer-events-auto cursor-pointer transition active:scale-95 z-20 ${
+                    <div
+                      className={`absolute top-1 left-1 text-[8px] sm:text-[9px] font-mono px-1.5 py-0.5 rounded font-bold shadow text-white flex items-center gap-1 pointer-events-none select-none z-20 ${
                         !isRecording
-                          ? 'bg-emerald-600 hover:bg-emerald-500'
+                          ? 'bg-emerald-600/90'
                           : isRecordingPaused
-                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                          : 'bg-rose-600 hover:bg-rose-500'
+                          ? 'bg-amber-500/90 text-slate-950'
+                          : 'bg-rose-600/90'
                       }`}
                     >
                       {!isRecording ? (
@@ -1693,7 +1756,7 @@ export default function App() {
                           <span>REC {formatTime(recordingTime)}</span>
                         </>
                       )}
-                    </button>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -1702,7 +1765,7 @@ export default function App() {
                   <p className="text-xs font-medium text-slate-400 pointer-events-none">{t.dropPrompt}</p>
                   <input
                     type="file"
-                    accept="video/*"
+                    accept="video/*,image/*"
                     onChange={handleFileUpload}
                     className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
                   />
