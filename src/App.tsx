@@ -83,6 +83,7 @@ export interface TranslationStrings {
   dontShowAgain: string;
   modalOk: string;
   confirmReset: string;
+  qualityTitle: string;
 }
 
 export const TRANSLATIONS: Record<Language, TranslationStrings> = {
@@ -122,7 +123,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: 'Загрузите горизонтальное видео или фото (16:9). Управляйте зелёным видоискателем мышкой или пальцем, приближайте колесиком мыши (или щипком на телефоне). Нажмите REC для записи динамического 9:16, 1:1 или 16:9 ролика. Вы можете нажать на зеленый значок микрофона справа перед стартом, чтобы наложить собственный голос (озвучить видео/слайд-шоу) в процессе записи! Для доступа к настройкам, прокрутите страницу вверх.',
     dontShowAgain: 'Больше не показывать',
     modalOk: 'Понятно',
-    confirmReset: 'Вы уверены, что хотите сбросить все настройки кадрирования и зума по умолчанию?'
+    confirmReset: 'Вы уверены, что хотите сбросить все настройки кадрирования и зума по умолчанию?',
+    qualityTitle: 'Качество и битрейт'
   },
   en: {
     headerSubtitle: 'Dynamic reframing of video and photo with LERP tracking',
@@ -160,7 +162,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: 'Upload a horizontal video or photo (16:9). Control the green viewfinder with mouse or touch, zoom with the wheel (or pinch gesture). Click REC to record a dynamic 9:16, 1:1 or 16:9 clip. You can click the green microphone icon on the right before starting to record your voice over the video or photo/slide-show in real time! To access settings, scroll the page up.',
     dontShowAgain: 'Don’t show again',
     modalOk: 'Got it',
-    confirmReset: 'Are you sure you want to reset all reframing and zoom settings to defaults?'
+    confirmReset: 'Are you sure you want to reset all reframing and zoom settings to defaults?',
+    qualityTitle: 'Quality & Bitrate'
   },
   es: {
     headerSubtitle: 'Reencuadre dinámico de video y foto con seguimiento LERP',
@@ -198,7 +201,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: 'Cargue un video o foto horizontal (16:9). Controle el visor verde, grabe con REC y use el micrófono de la derecha para grabar su voz.',
     dontShowAgain: 'No volver a mostrar',
     modalOk: 'Entendido',
-    confirmReset: '¿Está seguro de que desea restablecer todos los ajustes?'
+    confirmReset: '¿Está seguro de que desea restablecer todos los ajustes?',
+    qualityTitle: 'Calidad y Bitrate'
   },
   de: {
     headerSubtitle: 'Dynamisches Reframing von Video und Foto mit LERP-Tracking',
@@ -236,7 +240,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: 'Laden Sie ein horizontales Video/Foto (16:9) hoch. Steuern Sie den grünen Sucher, nehmen Sie mit REC auf und nutzen Sie das Mikrofon rechts für Sprachaufnahme.',
     dontShowAgain: 'Nicht mehr anzeigen',
     modalOk: 'Verstanden',
-    confirmReset: 'Sind Sie sicher, dass Sie alle Einstellungen zurücksetzen möchten?'
+    confirmReset: 'Sind Sie sicher, dass Sie alle Einstellungen zurücksetzen möchten?',
+    qualityTitle: 'Qualität & Bitrate'
   },
   fr: {
     headerSubtitle: 'Recadrage dynamique de vidéo/photo avec suivi LERP',
@@ -274,7 +279,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: 'Téléchargez une vidéo ou photo (16:9). Contrôlez le viseur, enregistrez avec REC, et utilisez le micro à droite pour enregistrer votre voix.',
     dontShowAgain: 'Ne plus afficher',
     modalOk: 'Compris',
-    confirmReset: 'Voulez-vous vraiment réinitialiser tous les paramètres?'
+    confirmReset: 'Voulez-vous vraiment réinitialiser tous les paramètres?',
+    qualityTitle: 'Qualité & Débit'
   },
   zh: {
     headerSubtitle: '视频与图片动态重构与 LERP 智能追踪',
@@ -312,7 +318,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: '上传 16:9 视频/图片，拖动绿色取景框，点击 REC 录制。可在右侧开启麦克风录音。',
     dontShowAgain: '不再显示',
     modalOk: '知道了',
-    confirmReset: '您确定要重置所有设置吗？'
+    confirmReset: '您确定要重置所有设置吗？',
+    qualityTitle: '画质与码率'
   },
   ja: {
     headerSubtitle: '動画・写真の LERPトラッキング動的リフレーミング',
@@ -350,7 +357,8 @@ export const TRANSLATIONS: Record<Language, TranslationStrings> = {
     modalText: '16:9の横型動画/写真をアップロードし、緑色のビューファインダーを操作してRECで録画。右側のマイクで自分の声を録音できます。',
     dontShowAgain: '次回から表示しない',
     modalOk: '了解',
-    confirmReset: 'すべての設定を初期化してもよろしいですか？'
+    confirmReset: 'すべての設定を初期化してもよろしいですか？',
+    qualityTitle: '画質とビットレート'
   }
 };
 
@@ -495,7 +503,8 @@ export default function App() {
   }, [wheelDirection]);
 
   const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
-  const [fps, setFps] = useState<number>(30);
+  const [fps, setFps] = useState<number>(60);
+  const [videoBitrate, setVideoBitrate] = useState<number>(24_000_000);
   const [showGuides, setShowGuides] = useState<boolean>(false);
   const [showSafeZone, setShowSafeZone] = useState<boolean>(false);
 
@@ -1169,7 +1178,8 @@ export default function App() {
 
       const options: MediaRecorderOptions = {
         mimeType: selectedMimeType,
-        videoBitsPerSecond: resolution === '1080p' ? 8_000_000 : 4_500_000
+        videoBitsPerSecond: videoBitrate,
+        audioBitsPerSecond: 320_000
       };
 
       const recorder = new MediaRecorder(combinedStream, options);
@@ -1408,10 +1418,11 @@ export default function App() {
     setDisplayZoom(1.25);
     setLerpFactor(0.1);
 
-    // Reset format & FPS & Resolution
+    // Reset format & FPS & Resolution & Bitrate
     setCropAspect('9:16');
     setResolution('1080p');
-    setFps(30);
+    setFps(60);
+    setVideoBitrate(24_000_000);
 
     // Reset options
     setWheelDirection('forward-plus');
@@ -2188,15 +2199,53 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Panel 3: Resolution & Overlays */}
+              {/* Panel 3: Resolution, Quality & Overlays */}
               <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-indigo-400" />
                     {t.resAndGuides}
                   </span>
+                  <span className="text-[10px] font-mono text-indigo-400 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                    {resolution} • {fps} FPS • {videoBitrate / 1_000_000}M
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-1 text-[10px]">
+
+                {/* Quality & Bitrate Presets */}
+                <div className="flex flex-col gap-1 pt-0.5">
+                  <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span>{t.qualityTitle}:</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    {[
+                      { id: 'eco', label: '8M • 30fps', sub: 'Эконом', bps: 8_000_000, f: 30 },
+                      { id: 'std', label: '16M • 60fps', sub: 'Стандарт', bps: 16_000_000, f: 60 },
+                      { id: 'ultra', label: '24M • 60fps', sub: 'Ultra HQ', bps: 24_000_000, f: 60 },
+                      { id: 'cinema', label: '32M • 120fps', sub: 'Extreme', bps: 32_000_000, f: 120 }
+                    ].map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          setVideoBitrate(preset.bps);
+                          setFps(preset.f);
+                          showToast(`${preset.sub}: ${preset.bps / 1_000_000} Мбит/с, ${preset.f} FPS`);
+                        }}
+                        className={`py-1 px-1 rounded flex flex-col items-center justify-center border transition ${
+                          videoBitrate === preset.bps && fps === preset.f
+                            ? 'bg-indigo-600 text-white border-indigo-400 font-bold shadow-md ring-1 ring-indigo-400/50'
+                            : 'bg-slate-800/60 text-slate-300 border-slate-700/60 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-[10px] font-mono font-bold leading-tight">{preset.label}</span>
+                        <span className="text-[8px] opacity-80 leading-tight">{preset.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Resolution & Overlays toggles */}
+                <div className="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t border-slate-800/60">
                   <button
                     onClick={() => setResolution(resolution === '1080p' ? '720p' : '1080p')}
                     className="py-1 px-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-center"
@@ -2204,16 +2253,21 @@ export default function App() {
                     {t.resLabel}: <span className="text-indigo-400 font-bold">{resolution}</span>
                   </button>
                   <button
-                    onClick={() => setFps(fps === 60 ? 30 : 60)}
+                    onClick={() => {
+                      const nextFps = fps === 60 ? 120 : fps === 120 ? 30 : 60;
+                      setFps(nextFps);
+                      showToast(`Частота кадров: ${nextFps} FPS`);
+                    }}
                     className="py-1 px-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-center"
                   >
                     FPS: <span className="text-indigo-400 font-bold">{fps}</span>
                   </button>
                 </div>
-                <div className="grid grid-cols-1 gap-1 pt-0.5">
+
+                <div className="grid grid-cols-2 gap-1 pt-0.5">
                   <button
                     onClick={() => setShowGuides(!showGuides)}
-                    className={`py-1 px-2 rounded text-[10px] font-medium border transition ${
+                    className={`py-1 px-1.5 rounded text-[10px] font-medium border transition text-center truncate ${
                       showGuides
                         ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                         : 'bg-slate-800/80 text-slate-400 border-slate-700'
@@ -2223,7 +2277,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => setShowSafeZone(!showSafeZone)}
-                    className={`py-1 px-2 rounded text-[10px] font-medium border transition ${
+                    className={`py-1 px-1.5 rounded text-[10px] font-medium border transition text-center truncate ${
                       showSafeZone
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                         : 'bg-slate-800/80 text-slate-400 border-slate-700'
